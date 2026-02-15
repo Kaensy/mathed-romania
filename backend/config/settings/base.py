@@ -35,6 +35,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
 ]
 
@@ -100,7 +101,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # =============================================================================
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.users.authentication.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -150,3 +151,15 @@ MEDIA_ROOT = BASE_DIR / "media"
 # Default primary key field type
 # =============================================================================
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# =============================================================================
+# Frontend URL (used in email links)
+# =============================================================================
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+
+
+# =============================================================================
+# Email
+# =============================================================================
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@mathed.ro")
