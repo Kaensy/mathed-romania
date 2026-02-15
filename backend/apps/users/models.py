@@ -16,8 +16,6 @@ from django.db import models
 
 from .managers import UserManager
 
-from decimal import Decimal
-
 
 class User(AbstractUser):
     """
@@ -113,23 +111,19 @@ class TeacherProfile(models.Model):
         related_name="teacher_profile",
     )
     referral_code = models.CharField(
-        max_length=8,
+        max_length=12,
         unique=True,
+        default=uuid.uuid4,
         editable=False,
     )
     commission_rate = models.DecimalField(
         max_digits=4,
         decimal_places=2,
         default=0.25,
-        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("1"))],
+        validators=[MinValueValidator(0), MaxValueValidator(1)],
         help_text="Commission rate (0.20 = 20%)",
     )
     school_name = models.CharField(max_length=200, blank=True)
-
-    def save(self, *args, **kwargs):
-        if not self.referral_code:
-            self.referral_code = uuid.uuid4().hex[:8].upper()
-        super().save(*args, **kwargs)
 
     class Meta:
         db_table = "teacher_profiles"

@@ -20,6 +20,10 @@ class Grade(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def published_units(self):
+        return self.units.filter(is_published=True)
+
 
 class Unit(models.Model):
     """
@@ -46,6 +50,10 @@ class Unit(models.Model):
     def __str__(self):
         return f"{self.grade.number}.{self.order} — {self.title}"
 
+    @property
+    def published_lessons(self):
+        return self.lessons.filter(is_published=True)
+
 
 class Lesson(models.Model):
     """
@@ -56,6 +64,10 @@ class Lesson(models.Model):
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="lessons")
     order = models.PositiveSmallIntegerField()
     title = models.CharField(max_length=200)
+    summary = models.TextField(
+        blank=True,
+        help_text="Short description shown in lesson lists",
+    )
     content = models.TextField(
         help_text="Rich text with KaTeX math notation",
     )
@@ -74,6 +86,10 @@ class Lesson(models.Model):
 
     def __str__(self):
         return f"{self.unit.grade.number}.{self.unit.order}.{self.order} — {self.title}"
+
+    @property
+    def active_exercises(self):
+        return self.exercises.filter(is_active=True)
 
 
 class Exercise(models.Model):
@@ -140,3 +156,35 @@ class Test(models.Model):
 
     def __str__(self):
         return f"Test: {self.unit.title}"
+
+
+class GlossaryTerm(models.Model):
+    """
+    Mathematical term definitions, cross-referenced with content.
+    Searchable by students, available offline.
+    """
+
+    term = models.CharField(max_length=200)
+    definition = models.TextField()
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="glossary_terms",
+    )
+    lesson = models.ForeignKey(
+        Lesson,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="glossary_terms",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "glossary_terms"
+        ordering = ["term"]
+
+    def __str__(self):
+        return self.term

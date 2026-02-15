@@ -54,6 +54,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError);
+        // Refresh failed — redirect to login
+        window.location.href = "/login";
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
