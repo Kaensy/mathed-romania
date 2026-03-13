@@ -1,0 +1,144 @@
+[
+  {
+    "type": "properties_list",
+    "title": "Ordinea operațiilor — cele trei ranguri",
+    "properties": [
+      {
+        "name": "Ordinul întâi (rang 1)",
+        "example": "adunarea și scăderea",
+        "symbolic": "+, -"
+      },
+      {
+        "name": "Ordinul doi (rang 2)",
+        "example": "înmulțirea și împărțirea",
+        "symbolic": "\\times, :"
+      },
+      {
+        "name": "Ordinul trei (rang 3)",
+        "example": "ridicarea la putere",
+        "symbolic": "a^n"
+      }
+    ]
+  },
+  {
+    "text": "Dacă într-un exercițiu sunt operații de același ordin, acestea se efectuează în ordinea în care sunt scrise, de la stânga la dreapta. Dacă sunt operații de ordine diferite, se efectuează mai întâi operațiile de ordinul trei, apoi cele de ordinul doi, și în final cele de ordinul întâi — respectând de fiecare dată ordinea de la stânga la dreapta.",
+    "type": "definition_box",
+    "title": "Regula de bază"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "27 + 15 - 32 = 42 - 32 = 10",
+        "explanation": "Operații de același ordin (adunare și scădere) — se efectuează de la stânga la dreapta:"
+      }
+    ],
+    "problem": "Calculează $27 + 15 - 32$."
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "2240 : 16 \\times 4 = 140 \\times 4 = 560",
+        "explanation": "Operații de același ordin (împărțire și înmulțire) — se efectuează de la stânga la dreapta:"
+      }
+    ],
+    "problem": "Calculează $2240 : 16 \\times 4$."
+  },
+  {
+    "text": "Pentru ușurința calculului, la operațiile de adunare și înmulțire putem aplica proprietățile de comutativitate și asociativitate — grupând termeni sau factori care dau rezultate rotunde.",
+    "type": "observation_box",
+    "title": "Folosirea comutativității și asociativității"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "137 + 455 + 63 + 45 = (137 + 63) + (455 + 45) = 200 + 500 = 700",
+        "explanation": "Grupăm termenii care dau sume rotunde:"
+      },
+      {
+        "latex": "4 \\times 231 \\times 25 = (4 \\times 25) \\times 231 = 100 \\times 231 = 23100",
+        "explanation": "Grupăm factorii care dau produse rotunde:"
+      }
+    ],
+    "problem": "Calculează $137 + 455 + 63 + 45$ și $4 \\times 231 \\times 25$."
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "2^3 = 8",
+        "explanation": "Mai întâi calculăm puterile (ordinul 3):"
+      },
+      {
+        "latex": "4 \\times 8 = 32, \\quad 51 \\times 20 = 1020, \\quad 324 : 18 = 18",
+        "explanation": "Apoi înmulțirile și împărțirile (ordinul 2), de la stânga la dreapta:"
+      },
+      {
+        "latex": "32 + 1020 - 18 + 30 = 1052 - 18 + 30 = 1034 + 30 = 1064",
+        "explanation": "În final adunările și scăderile (ordinul 1), de la stânga la dreapta:"
+      }
+    ],
+    "problem": "Calculează $4 \\times 2^3 + 51 \\times 20 - 324 : 18 + 30$."
+  },
+  {
+    "text": "Dacă într-un exercițiu există paranteze și acolade, se efectuează mai întâi operațiile din parantezele rotunde (), apoi cele din parantezele pătrate (sau drepte) [], apoi operațiile din acolade {}, și în final ce avem în afara acoladelor. Într-un exercițiu cu paranteze în paranteze, întotdeauna se lucrează din interior spre exterior.",
+    "type": "definition_box",
+    "title": "Regula parantezelor"
+  },
+  {
+    "text": "Nu sări peste un nivel de paranteze! Întotdeauna rezolvă cea mai interioară paranteză primul, înlocuiește cu rezultatul, apoi treci la nivelul următor.",
+    "type": "warning_box",
+    "title": "Greșeală frecventă"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "3^2 + 48048 : 24 = 9 + 2002 = 2011",
+        "explanation": "Lucrăm din interior spre exterior. Calculăm paranteza rotundă mai întâi — puterea și împărțirea înainte de adunare:"
+      },
+      {
+        "latex": "100 : 4 + 5 \\times 2011 = 25 + 10055 = 10080",
+        "explanation": "Înlocuim rezultatul în paranteza rotundă și calculăm paranteza pătrată — înmulțirea înainte de adunare:"
+      },
+      {
+        "latex": "40 \\times 10080 + 2011 = 403200 + 2011 = 405211",
+        "explanation": "Înlocuim și finalizăm — înmulțirea înainte de adunare:"
+      }
+    ],
+    "problem": "Calculează $40 \\times [100 : 4 + 5(3^2 + 48048 : 24)] + 2011$."
+  },
+  {
+    "rows": [
+      [
+        "1 (prima)",
+        "Paranteze",
+        "din interior spre exterior: () → [] → {}"
+      ],
+      [
+        "2",
+        "Puteri $a^n$",
+        "ordinul trei"
+      ],
+      [
+        "3",
+        "Înmulțire $\\times$, Împărțire $:$",
+        "ordinul doi, stânga → dreapta"
+      ],
+      [
+        "4 (ultima)",
+        "Adunare $+$, Scădere $-$",
+        "ordinul întâi, stânga → dreapta"
+      ]
+    ],
+    "type": "summary_table",
+    "title": "Ordinea completă a operațiilor",
+    "headers": [
+      "Prioritate",
+      "Operație",
+      "Notă"
+    ]
+  }
+]

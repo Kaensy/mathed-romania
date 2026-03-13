@@ -1,0 +1,121 @@
+[
+  {
+    "text": "Legenda spune că micul Gauss, pe când era elev, a calculat 1 + 2 + 3 + ... + 100 în câteva secunde, spre uimirea profesorului său. Cum a reușit?",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Pentru orice număr natural $n \\geq 1$ are loc egalitatea: suma primelor $n$ numere naturale nenule este $n(n+1) : 2$.",
+    "type": "definition_box",
+    "title": "Suma lui Gauss"
+  },
+  {
+    "type": "formula_card",
+    "latex": "1 + 2 + 3 + \\cdots + n = n \\cdot (n+1) : 2",
+    "title": "Formula lui Gauss"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "1 + 2 = 2 \\cdot 3 : 2 = 6 : 2 = 3 \\checkmark",
+        "explanation": "Pentru n = 2:"
+      },
+      {
+        "latex": "1 + 2 + 3 = 3 \\cdot 4 : 2 = 12 : 2 = 6 \\checkmark",
+        "explanation": "Pentru n = 3:"
+      }
+    ],
+    "problem": "Verifică formula pentru n = 2 și n = 3."
+  },
+  {
+    "type": "collapsible",
+    "title": "Vrei să știi de ce funcționează formula lui Gauss?",
+    "blocks": [
+      {
+        "text": "Notăm cu S suma primelor n numere naturale nenule și scriem suma în două moduri: crescător și descrescător.",
+        "type": "paragraph"
+      },
+      {
+        "type": "block_equation",
+        "latex": "S = 1 + 2 + 3 + \\cdots + (n-1) + n"
+      },
+      {
+        "type": "block_equation",
+        "latex": "S = n + (n-1) + (n-2) + \\cdots + 2 + 1"
+      },
+      {
+        "text": "Adunăm cele două relații membru cu membru. Fiecare pereche de termeni corespondenți dă suma $n + 1$, și avem exact $n$ astfel de perechi:",
+        "type": "paragraph"
+      },
+      {
+        "type": "block_equation",
+        "latex": "2S = (n+1) + (n+1) + \\cdots + (n+1) = n(n+1)"
+      },
+      {
+        "type": "block_equation",
+        "latex": "S = \\frac{n(n+1)}{2}"
+      }
+    ]
+  },
+  {
+    "text": "Un raționament asemănător se aplică și pentru a calcula suma unor numere care se obțin numărând din $r$ în $r$, începând de la primul termen al sumei, unde $r \\neq 0$ este un număr natural dat.",
+    "type": "paragraph"
+  },
+  {
+    "type": "worked_example_multi",
+    "methods": [
+      {
+        "steps": [
+          {
+            "latex": "20 = 20 + 3 \\cdot 0, \\quad 23 = 20 + 3 \\cdot 1, \\quad \\ldots, \\quad 257 = 20 + 3 \\cdot 79",
+            "explanation": "Observăm că termenii cresc din 3 în 3, pornind de la 20. Rescriim fiecare termen:"
+          },
+          {
+            "latex": "79 - 0 + 1 = 80 \\text{ termeni}",
+            "explanation": "Numărul de termeni: de la indicele 0 la 79 sunt 80 de termeni."
+          },
+          {
+            "latex": "S = 20 \\cdot 80 + 3(1 + 2 + \\cdots + 79)",
+            "explanation": "Descompunem suma:"
+          },
+          {
+            "latex": "1 + 2 + \\cdots + 79 = \\frac{79 \\cdot 80}{2} = 79 \\cdot 40 = 3160",
+            "explanation": "Aplicăm formula lui Gauss pentru 1 + 2 + ... + 79:"
+          },
+          {
+            "latex": "S = 1600 + 3 \\cdot 3160 = 1600 + 9480 = 11080",
+            "explanation": "Calculăm S:"
+          }
+        ],
+        "title": "Metoda 1 — Descompunere + Gauss"
+      },
+      {
+        "steps": [
+          {
+            "latex": "S = 20 + 23 + 26 + \\cdots + 254 + 257",
+            "explanation": "Scriem suma în ordine crescătoare și descrescătoare, apoi adunăm membre cu membre:"
+          },
+          {
+            "latex": "S = 257 + 254 + 251 + \\cdots + 23 + 20",
+            "explanation": ""
+          },
+          {
+            "latex": "2S = 277 + 277 + \\cdots + 277 = 277 \\cdot 80",
+            "explanation": "Fiecare pereche de termeni corespondenți dă suma 20 + 257 = 277, și avem 80 de perechi:"
+          },
+          {
+            "latex": "S = \\frac{277 \\cdot 80}{2} = 277 \\cdot 40 = 11080",
+            "explanation": "Calculăm S:"
+          }
+        ],
+        "title": "Metoda 2 — Perechile lui Gauss"
+      }
+    ],
+    "problem": "Calculează S = 20 + 23 + 26 + ... + 254 + 257."
+  },
+  {
+    "text": "Termenii sumei 20 + 23 + 26 + ... + 257 sunt din 3 în 3. Împărțind la 3: 20 = 3·6 + 2, 23 = 3·7 + 2, ..., 257 = 3·85 + 2. Indicii merg de la 6 la 85, deci numărul de termeni este 85 − 6 + 1 = 80.",
+    "type": "observation_box",
+    "title": "Metoda contorului — cum determinăm numărul de termeni"
+  }
+]

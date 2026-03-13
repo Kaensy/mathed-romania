@@ -135,7 +135,7 @@ docker compose logs -f db           # View PostgreSQL logs
 
 ## Project-Specific Notes
 
-- **Custom User Model:** Email-based auth (no username). The `AUTH_USER_MODEL = "users.User"` setting is baked in from day one. Never change this after the first migration.
+- **Custom User Model:** Email-based auth (no username). The `AUTH_USER_MODEL = "users.User"` setting is baked in from day one
 - **Settings Split:** `config/settings/base.py` (shared), `development.py` (local), `production.py` (Railway/VPS). `manage.py` defaults to development.
 - **CORS:** The dev settings allow requests from `localhost:5173` (Vite). Production requires explicit domain configuration.
-- **JWT Cookies:** Tokens are stored in httpOnly cookies (not localStorage) for security — important since our users are minors.
+- **JWT Cookies:** Tokens are stored in httpOnly cookies (not localStorage) for security — important since users are minors.

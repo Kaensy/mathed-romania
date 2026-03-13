@@ -1,0 +1,112 @@
+[
+  {
+    "text": "Computerele nu știu să numere ca noi. În loc de 10 cifre, ele folosesc doar 2: 0 și 1. De aceea înțelegerea bazelor de numerație este esențială în matematica modernă.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Orice număr natural n se poate scrie în mod unic ca o sumă de produse în care unul dintre factori este o cifră a sa, iar celălalt o putere a lui 10. Aceasta se numește scrierea sau descompunerea în baza 10.",
+    "type": "definition_box",
+    "title": "Scrierea în baza 10 (forma canonică generalizată)"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "35204 = 3 \\times 10^4 + 5 \\times 10^3 + 2 \\times 10^2 + 0 \\times 10^1 + 4 \\times 10^0",
+        "explanation": "Fiecare cifră se înmulțește cu puterea lui 10 corespunzătoare ordinului său:"
+      },
+      {
+        "latex": "\\overline{abcd} = a \\times 10^3 + b \\times 10^2 + c \\times 10^1 + d",
+        "explanation": "Formula generală pentru un număr de 4 cifre $\\overline{abcd}$:"
+      }
+    ],
+    "problem": "Scrie numărul 35204 în baza 10."
+  },
+  {
+    "text": "Scrierea numerelor naturale împreună cu operațiile de adunare, scădere, înmulțire, împărțire și ridicare la putere constituie sistemul de numerație zecimal. Se folosesc cele 10 cifre: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9.",
+    "type": "observation_box",
+    "title": "Sistemul de numerație zecimal"
+  },
+  {
+    "text": "Computerele folosesc sistemul binar de numerație, care are baza 2 — două unități de un anumit ordin formează o unitate de ordin superior. Pentru scrierea unui număr natural în baza 2 se folosesc doar cifrele 0 și 1.",
+    "type": "definition_box",
+    "title": "Sistemul binar (baza 2)"
+  },
+  {
+    "text": "Când lucrăm cu mai multe baze de numerație, scriem baza ca indice. De exemplu: $111_{(10)}$ indică numărul o sută unsprezece în baza 10, iar $111_{(2)}$ indică un număr scris în baza 2 (care este șapte în baza 10).",
+    "type": "observation_box",
+    "title": "Notarea bazei"
+  },
+  {
+    "text": "Pentru a converti un număr din baza 2 în baza 10, scriem fiecare cifră înmulțită cu puterea lui 2 corespunzătoare poziției sale (numărând de la dreapta, începând cu $2^0$), apoi adunăm toate produsele.",
+    "type": "definition_box",
+    "title": "Conversia din baza 2 în baza 10"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "111_{(2)} = 1 \\times 2^2 + 1 \\times 2^1 + 1 \\times 2^0 = 4 + 2 + 1 = 7_{(10)}",
+        "explanation": "Pentru $111_{(2)}$ — 3 cifre, puterile lui 2 sunt $2^2, 2^1, 2^0$:"
+      },
+      {
+        "latex": "1100111_{(2)} = 1 \\times 2^6 + 1 \\times 2^5 + 0 \\times 2^4 + 0 \\times 2^3 + 1 \\times 2^2 + 1 \\times 2^1 + 1 \\times 2^0",
+        "explanation": "Pentru $1100111_{(2)}$ — 7 cifre, puterile lui 2 de la $2^6$ la $2^0$:"
+      },
+      {
+        "latex": "= 64 + 32 + 0 + 0 + 4 + 2 + 1 = 103_{(10)}",
+        "explanation": ""
+      }
+    ],
+    "problem": "Convertește $111_{(2)}$ și $1100111_{(2)}$ în baza 10."
+  },
+  {
+    "text": "Pentru a scrie un număr natural în baza 2, efectuăm împărțiri succesive la 2 până când câtul devine 0. Numărul în baza 2 se formează din ultimul cât nenul, urmat de resturi scrise în ordinea inversă obținerii lor.",
+    "type": "definition_box",
+    "title": "Conversia din baza 10 în baza 2"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "18 : 2 = 9 \\text{ rest } 0",
+        "explanation": "Împărțim succesiv la 2 și reținem resturile:"
+      },
+      {
+        "latex": "9 : 2 = 4 \\text{ rest } 1",
+        "explanation": ""
+      },
+      {
+        "latex": "4 : 2 = 2 \\text{ rest } 0",
+        "explanation": ""
+      },
+      {
+        "latex": "2 : 2 = 1 \\text{ rest } 0",
+        "explanation": ""
+      },
+      {
+        "latex": "18_{(10)} = 10010_{(2)}",
+        "explanation": "Ultimul cât nenul este 1. Citim resturile în ordine inversă: 0, 0, 1, 0 — precedate de ultimul cât 1:"
+      },
+      {
+        "latex": "1 \\times 2^4 + 0 \\times 2^3 + 0 \\times 2^2 + 1 \\times 2^1 + 0 \\times 2^0 = 16 + 0 + 0 + 2 + 0 = 18 \\checkmark",
+        "explanation": "Verificare — convertim înapoi în baza 10:"
+      }
+    ],
+    "problem": "Convertește $18_{(10)}$ în baza 2."
+  },
+  {
+    "type": "formula_card",
+    "latex": "\\overline{abcd}_{(x)} = a \\times x^3 + b \\times x^2 + c \\times x + d, \\quad a,b,c,d < x",
+    "title": "Forma generală în baza x"
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "to_base": 2,
+      "from_base": 10,
+      "default_value": 18
+    },
+    "component": "base_converter"
+  }
+]

@@ -1,0 +1,111 @@
+[
+  {
+    "text": "Dacă un elev citește 5 pagini pe zi, câte pagini citește în 3 zile? În loc să aduni 5 + 5 + 5, poți folosi înmulțirea: 3 × 5 = 15.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Înmulțirea a două numere naturale m și n este o adunare repetată (de m ori) a numărului n. Numerele care se înmulțesc se numesc factori, iar rezultatul înmulțirii se numește produs.",
+    "type": "definition_box",
+    "title": "Definiție — Înmulțirea"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "3 \\times 5 = 5 + 5 + 5 = 15",
+        "explanation": "3 × 5 înseamnă că adunăm 5 de trei ori:"
+      },
+      {
+        "explanation": "3 și 5 sunt factorii înmulțirii, 15 este produsul."
+      }
+    ],
+    "problem": "Scrie înmulțirea 3 × 5 ca adunare repetată."
+  },
+  {
+    "text": "Produsul oricărui număr cu 0 este egal cu 0. Se spune că 0 este element absorbant al înmulțirii: a × 0 = 0 × a = 0.",
+    "type": "definition_box",
+    "title": "Elementul absorbant"
+  },
+  {
+    "text": "Pentru a înmulți două numere naturale, înmulțim fiecare cifră a unui număr cu fiecare cifră a celuilalt număr. Însumând produsele parțiale obținute, găsim rezultatul înmulțirii. Produsele parțiale obținute prin înmulțirea cu 0 nu se mai scriu.",
+    "type": "definition_box",
+    "title": "Regula înmulțirii în coloană"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "2 \\times 3249 = 6498",
+        "explanation": "Înmulțim 3249 cu cifra unităților lui 102, adică cu 2:"
+      },
+      {
+        "explanation": "Înmulțim 3249 cu cifra zecilor lui 102, adică cu 0 — produsul parțial cu 0 nu se scrie."
+      },
+      {
+        "latex": "1 \\times 3249 = 3249",
+        "explanation": "Înmulțim 3249 cu cifra sutelor lui 102, adică cu 1, și îl scriem decalat cu 2 poziții:"
+      },
+      {
+        "latex": "6498 + 324900 = 331398",
+        "explanation": "Adunăm produsele parțiale:"
+      },
+      {
+        "latex": "3249 \\times 102 = 331398",
+        "explanation": "Rezultat:"
+      }
+    ],
+    "problem": "Calculează 3249 × 102 în coloană."
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "operands": [
+        3249,
+        102
+      ],
+      "operation": "multiplication"
+    },
+    "component": "column_arithmetic"
+  },
+  {
+    "type": "properties_list",
+    "title": "Proprietățile înmulțirii",
+    "properties": [
+      {
+        "name": "Comutativitate",
+        "example": "$12 \\times 3 = 3 \\times 12 = 36$",
+        "symbolic": "a \\times b = b \\times a"
+      },
+      {
+        "name": "Asociativitate",
+        "example": "$(2 \\times 3) \\times 4 = 2 \\times (3 \\times 4) = 24$",
+        "symbolic": "(a \\times b) \\times c = a \\times (b \\times c)"
+      },
+      {
+        "name": "Element neutru",
+        "example": "$23 \\times 1 = 1 \\times 23 = 23$",
+        "symbolic": "a \\times 1 = 1 \\times a = a"
+      },
+      {
+        "name": "Element absorbant",
+        "example": "$17 \\times 0 = 0$",
+        "symbolic": "a \\times 0 = 0 \\times a = 0"
+      }
+    ]
+  },
+  {
+    "text": "Orice număr par este de forma 2k și orice număr impar este de forma 2k + 1, unde k este un număr natural oarecare. Exemple: 10 = 2 × 5, 23 = 2 × 10 + 3.",
+    "type": "observation_box",
+    "title": "Paritatea și forma numerelor"
+  },
+  {
+    "text": "Produsul a 2 sau mai multe numere naturale impare este un număr impar. Dacă cel puțin un factor este par, atunci produsul este par. Exemple: 3 × 5 × 7 = 105 (impar), 3 × 5 × 4 = 60 (par, pentru că 4 este par).",
+    "type": "observation_box",
+    "title": "Paritatea produsului"
+  },
+  {
+    "text": "Ultima cifră a unui produs este ultima cifră a produsului ultimelor cifre ale fiecărui factor. Exemplu: U(1234 × 567) = U(4 × 7) = U(28) = 8.",
+    "type": "observation_box",
+    "title": "Ultima cifră a unui produs"
+  }
+]

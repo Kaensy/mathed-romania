@@ -1,0 +1,124 @@
+[
+  {
+    "text": "Dacă la un concurs participă 1204 elevi, putem spune că au participat aproximativ 1000 elevi — un număr mai ușor de reținut. Aceasta este ideea din spatele aproximărilor.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Uneori nu este necesar să știm exact toate cifrele unui număr, ci numai ordinul său de mărime. Atunci când utilizăm, în locul unui număr natural dat, un alt număr apropiat de el, spunem că am folosit o aproximare a numărului respectiv.",
+    "type": "paragraph"
+  },
+  {
+    "text": "Aproximarea unui număr natural se poate face în două moduri: prin lipsă sau prin adaos.",
+    "type": "observation_box",
+    "title": "De reținut"
+  },
+  {
+    "text": "Aproximarea prin lipsă la zeci (sute, mii, etc.) este cel mai mare număr format numai din zeci (sute, mii, etc.), mai mic sau egal cu numărul dat.",
+    "type": "definition_box",
+    "title": "Aproximarea prin lipsă"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "2537 \\rightarrow 2530",
+        "explanation": "La zeci — cel mai mare multiplu de 10 mai mic sau egal cu 2537:"
+      },
+      {
+        "latex": "2537 \\rightarrow 2500",
+        "explanation": "La sute — cel mai mare multiplu de 100 mai mic sau egal cu 2537:"
+      }
+    ],
+    "problem": "Găsește aproximarea prin lipsă la zeci și la sute a numărului 2537."
+  },
+  {
+    "text": "Aproximarea prin adaos la zeci (sute, mii, etc.) este cel mai mic număr natural format numai din zeci (sute, mii, etc.) mai mare decât numărul dat.",
+    "type": "definition_box",
+    "title": "Aproximarea prin adaos"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "2537 \\rightarrow 2540",
+        "explanation": "La zeci — cel mai mic multiplu de 10 mai mare decât 2537:"
+      },
+      {
+        "latex": "2537 \\rightarrow 2600",
+        "explanation": "La sute — cel mai mic multiplu de 100 mai mare decât 2537:"
+      }
+    ],
+    "problem": "Găsește aproximarea prin adaos la zeci și la sute a numărului 2537."
+  },
+  {
+    "text": "Rotunjirea unui număr natural la zeci (sute, mii, etc.) este aproximarea prin lipsă sau prin adaos cea mai apropiată de număr.",
+    "type": "definition_box",
+    "title": "Rotunjirea unui număr natural"
+  },
+  {
+    "text": "Privim cifra ordinului imediat inferior celui la care rotunjim: dacă această cifră este mai mare sau egală cu 5, rotunjim prin adaos; dacă este mai mică decât 5, rotunjim prin lipsă.",
+    "type": "definition_box",
+    "title": "Regula de rotunjire"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "253\\underline{7} \\rightarrow 2540 \\quad (7 \\geq 5 \\Rightarrow \\text{prin adaos})",
+        "explanation": "La zeci — privim cifra unităților: 7. Deoarece 7 ≥ 5, rotunjim prin adaos:"
+      },
+      {
+        "latex": "25\\underline{3}7 \\rightarrow 2500 \\quad (3 < 5 \\Rightarrow \\text{prin lipsă})",
+        "explanation": "La sute — privim cifra zecilor: 3. Deoarece 3 < 5, rotunjim prin lipsă:"
+      }
+    ],
+    "problem": "Rotunjește numărul 2537 la zeci și la sute."
+  },
+  {
+    "rows": [
+      [
+        "782",
+        "790",
+        "780",
+        "780",
+        "800",
+        "700",
+        "800"
+      ],
+      [
+        "4150",
+        "4160",
+        "4150",
+        "4150",
+        "4200",
+        "4100",
+        "4200"
+      ]
+    ],
+    "type": "summary_table",
+    "title": "Tabel comparativ — aproximări și rotunjiri",
+    "headers": [
+      "Număr",
+      "Aprox. la zeci (adaos)",
+      "Aprox. la zeci (lipsă)",
+      "Rotunjire la zeci",
+      "Aprox. la sute (adaos)",
+      "Aprox. la sute (lipsă)",
+      "Rotunjire la sute"
+    ]
+  },
+  {
+    "text": "Când cifra de decizie este exact 5, rotunjim prin adaos (în sus). De exemplu, 4150 rotunjit la zeci este 4150 (cifra unităților este 0), dar rotunjit la sute este 4200 (cifra zecilor este 5, deci prin adaos).",
+    "type": "observation_box",
+    "title": "Cazul special — cifra 5"
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "mode": "rounding",
+      "number": 2537,
+      "round_to": 10
+    },
+    "component": "number_line"
+  }
+]

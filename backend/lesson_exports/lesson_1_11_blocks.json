@@ -1,0 +1,111 @@
+[
+  {
+    "text": "Suprafața unui pătrat cu latura 5 cm este 5 × 5 = 25 cm². Volumul unui cub cu latura 3 cm este 3 × 3 × 3 = 27 cm³. Înmulțirile repetate ale aceluiași număr apar tot timpul — de aceea avem o notație specială: puterea.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Dacă a și n sunt numere naturale cu n > 1, atunci produsul a × a × a × ... × a (n factori) se notează $a^n$ și se citește „a la puterea n\". Numărul a se numește bază, iar n se numește exponent.",
+    "type": "definition_box",
+    "title": "Definiție — Puterea cu exponent natural"
+  },
+  {
+    "type": "formula_card",
+    "latex": "\\underbrace{a \\times a \\times a \\times \\cdots \\times a}_{n \\text{ factori}} = a^n",
+    "title": "Notația puterii"
+  },
+  {
+    "text": "Prin convenție: $a^0 = 1$ pentru orice număr natural nenul a. De asemenea, $a^1 = a$ pentru orice număr natural a. Expresia $0^0$ nu se definește.",
+    "type": "definition_box",
+    "title": "Convenții speciale"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "2^6 = 2 \\times 2 \\times 2 \\times 2 \\times 2 \\times 2 = 64",
+        "explanation": "Scriem ca produs repetat:"
+      },
+      {
+        "latex": "3^4 = 3 \\times 3 \\times 3 \\times 3 = 81",
+        "explanation": ""
+      }
+    ],
+    "problem": "Calculează $2^6$ și $3^4$."
+  },
+  {
+    "type": "properties_list",
+    "title": "Regulile de calcul cu puteri (a, b, m, n numere naturale nenule)",
+    "properties": [
+      {
+        "name": "Înmulțirea puterilor cu aceeași bază",
+        "example": "$2^6 \\times 2^4 = 2^{6+4} = 2^{10}$",
+        "symbolic": "a^m \\times a^n = a^{m+n}"
+      },
+      {
+        "name": "Împărțirea puterilor cu aceeași bază (m ≥ n)",
+        "example": "$5^9 : 5^3 = 5^{9-3} = 5^6$",
+        "symbolic": "a^m : a^n = a^{m-n}"
+      },
+      {
+        "name": "Puterea unei puteri",
+        "example": "$(2^5)^4 = 2^{5 \\times 4} = 2^{20}$",
+        "symbolic": "(a^m)^n = a^{m \\times n}"
+      },
+      {
+        "name": "Puterea unui produs",
+        "example": "$(3 \\times 5)^2 = 3^2 \\times 5^2 = 9 \\times 25 = 225$",
+        "symbolic": "(a \\times b)^n = a^n \\times b^n"
+      },
+      {
+        "name": "Puterea unui cât",
+        "example": "$(10 : 5)^6 = 10^6 : 5^6 = 2^6 = 64$",
+        "symbolic": "(a : b)^n = a^n : b^n"
+      }
+    ]
+  },
+  {
+    "text": "Regulile 4 și 5 pot fi folosite și în sens invers: $a^n \\times b^n = (a \\times b)^n$ și $a^n : b^n = (a : b)^n$ — regula de înmulțire/împărțire a puterilor cu același exponent.",
+    "type": "observation_box",
+    "title": "Forma inversă a regulilor 4 și 5"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "25^{10} = (5^2)^{10} = 5^{20}, \\quad 125^{16} = (5^3)^{16} = 5^{48}",
+        "explanation": "Scriem bazele ca puteri ale lui 5: $25 = 5^2$, $125 = 5^3$."
+      },
+      {
+        "latex": "25^{10} \\times 5^{30} : 125^{16} : (5^3)^0 = 5^{20} \\times 5^{30} : 5^{48} : 1",
+        "explanation": "Orice număr la puterea 0 este 1: $(5^3)^0 = 1$."
+      },
+      {
+        "latex": "= 5^{20+30} : 5^{48} = 5^{50} : 5^{48} = 5^{50-48} = 5^2",
+        "explanation": "Aplicăm regulile 1 și 2:"
+      }
+    ],
+    "problem": "Scrie sub forma unei singure puteri: $25^{10} \\times 5^{30} : 125^{16} : (5^3)^0$."
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "2^{29} = 2^{26+3} = 2^{26} \\times 2^3, \\quad 2^{27} = 2^{26} \\times 2^1",
+        "explanation": "Scriem fiecare termen punând în evidență factorul $2^{26}$:"
+      },
+      {
+        "latex": "2^{26} \\times 2^3 + 2^{26} \\times 2^1 - 2^{26} = 2^{26}(2^3 + 2^1 - 1)",
+        "explanation": "Scoatem factorul comun $2^{26}$:"
+      },
+      {
+        "latex": "= 2^{26}(8 + 2 - 1) = 2^{26} \\times 9",
+        "explanation": "Calculăm paranteza și simplificăm:"
+      },
+      {
+        "latex": "= 9 \\times 4^{13} \\checkmark",
+        "explanation": "Scriem $2^{26} = (2^2)^{13} = 4^{13}$:"
+      }
+    ],
+    "problem": "Utilizând factorul comun, arătați că $2^{29} + 2^{27} - 2^{26} = 9 \\times 4^{13}$."
+  }
+]

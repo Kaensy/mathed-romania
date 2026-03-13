@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -48,11 +49,11 @@ export default function DashboardPage() {
 
         {/* Placeholder cards */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border bg-white p-6">
-            <div className="mb-3 text-2xl">📚</div>
-            <h3 className="font-semibold text-gray-900">Lecții</h3>
-            <p className="mt-1 text-sm text-gray-500">Disponibil în curând — Phase 3</p>
-          </div>
+                  <Link to="/grade/5" className="rounded-xl border bg-white p-6 hover:border-primary-300 hover:shadow-sm transition-all block">
+                      <div className="mb-3 text-2xl">📚</div>
+                      <h3 className="font-semibold text-gray-900">Lecții</h3>
+                      <p className="mt-1 text-sm text-gray-500">Clasa a V-a — Matematică</p>
+                  </Link>
           <div className="rounded-xl border bg-white p-6">
             <div className="mb-3 text-2xl">✏️</div>
             <h3 className="font-semibold text-gray-900">Exerciții</h3>

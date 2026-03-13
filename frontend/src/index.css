@@ -3,4 +3,3 @@
 @tailwind utilities;
 
 /* KaTeX import — loaded from node_modules */
-@import "katex/dist/katex.min.css";

@@ -2,7 +2,7 @@
 Content serializers for MathEd Romania.
 
 Nested serialization: Grade → Units → Lessons.
-Lesson detail includes full content; list view shows summary only.
+Lesson detail includes full blocks array; list view shows summary only.
 """
 from rest_framework import serializers
 
@@ -22,7 +22,7 @@ class GlossaryTermSerializer(serializers.ModelSerializer):
 
 
 class LessonListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for lesson lists — no full content."""
+    """Lightweight serializer for lesson lists — no blocks content."""
 
     exercise_count = serializers.SerializerMethodField()
 
@@ -35,12 +35,18 @@ class LessonListSerializer(serializers.ModelSerializer):
 
 
 class LessonDetailSerializer(serializers.ModelSerializer):
-    """Full lesson with content and exercises."""
+    """Full lesson with blocks and exercises."""
 
     exercises = ExerciseSerializer(many=True, source="active_exercises")
     glossary_terms = GlossaryTermSerializer(many=True, read_only=True)
+    unit_id = serializers.IntegerField(source="unit.id", read_only=True)
     unit_title = serializers.CharField(source="unit.title", read_only=True)
+    unit_order = serializers.IntegerField(source="unit.order", read_only=True)
     grade_number = serializers.IntegerField(source="unit.grade.number", read_only=True)
+
+    # Navigation helpers — previous and next lesson in same unit
+    prev_lesson_id = serializers.SerializerMethodField()
+    next_lesson_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Lesson
@@ -49,14 +55,38 @@ class LessonDetailSerializer(serializers.ModelSerializer):
             "order",
             "title",
             "summary",
-            "content",
+            "blocks",
             "practice_minimum",
+            "unit_id",
             "unit_title",
+            "unit_order",
             "grade_number",
+            "prev_lesson_id",
+            "next_lesson_id",
             "exercises",
             "glossary_terms",
             "updated_at",
         ]
+
+    def get_prev_lesson_id(self, obj):
+        prev = (
+            Lesson.objects
+            .filter(unit=obj.unit, order__lt=obj.order, is_published=True)
+            .order_by("-order")
+            .values_list("id", flat=True)
+            .first()
+        )
+        return prev
+
+    def get_next_lesson_id(self, obj):
+        next_ = (
+            Lesson.objects
+            .filter(unit=obj.unit, order__gt=obj.order, is_published=True)
+            .order_by("order")
+            .values_list("id", flat=True)
+            .first()
+        )
+        return next_
 
 
 class TestSerializer(serializers.ModelSerializer):

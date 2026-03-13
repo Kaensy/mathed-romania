@@ -1,0 +1,89 @@
+[
+  {
+    "text": "Ai 23 de bomboane și vrei să le împarți la 4 copii în mod egal. Fiecăruia îi revin 5 bomboane și mai rămân 3 — restul împărțirii. Nu întotdeauna împărțirea este exactă.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "La împărțirea cu rest, scădem repetat împărțitorul din deîmpărțit până când nu mai putem. Numărul rămas se numește rest și este întotdeauna mai mic decât împărțitorul.",
+    "type": "definition_box",
+    "title": "Împărțirea cu rest"
+  },
+  {
+    "type": "formula_card",
+    "latex": "a = b \\times q + r, \\quad r < b",
+    "title": "Relația fundamentală a împărțirii cu rest"
+  },
+  {
+    "text": "Numărul a se numește deîmpărțit. Numărul b se numește împărțitor. Numărul q se numește cât. Numărul r se numește rest. Condiția esențială: restul r este strict mai mic decât împărțitorul b.",
+    "type": "definition_box",
+    "title": "Termenii împărțirii cu rest"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "5 \\times 4 = 20",
+        "explanation": "Câte ori intră 4 în 23? De 5 ori, deoarece 5 × 4 = 20 și 6 × 4 = 24 > 23. Câtul este 5."
+      },
+      {
+        "latex": "23 - 20 = 3, \\quad 3 < 4 \\checkmark",
+        "explanation": "Restul este 23 − 20 = 3. Verificăm că restul < împărțitor: 3 < 4."
+      },
+      {
+        "latex": "23 = 4 \\times 5 + 3 \\quad \\Leftrightarrow \\quad 23 : 4 = 5 \\text{ rest } 3",
+        "explanation": "Scriem relația împărțirii cu rest și notația:"
+      }
+    ],
+    "problem": "Împarte 23 la 4 și scrie relația împărțirii cu rest."
+  },
+  {
+    "text": "Oricare ar fi numerele naturale a și b cu b ≠ 0, există numerele naturale q și r unic determinate astfel încât a = b × q + r, cu r < b.",
+    "type": "definition_box",
+    "title": "Teorema împărțirii cu rest"
+  },
+  {
+    "text": "Dacă r = 0, împărțirea este exactă și scriem a : b = q. Dacă a < b, atunci q = 0 și r = a (de exemplu: 3 : 7 = 0 rest 3).",
+    "type": "observation_box",
+    "title": "Cazuri particulare"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "4 \\times 283 = 1132, \\quad 1234 - 1132 = 102 < 283 \\Rightarrow \\text{prima cifră: } 4",
+        "explanation": "Deîmpărțitul este de ordinul zecilor de mii. 12 < 283, 123 < 283, dar 1234 > 283. Câte ori intră 283 în 1234?"
+      },
+      {
+        "latex": "3 \\times 283 = 849, \\quad 1025 - 849 = 176 < 283 \\Rightarrow \\text{a doua cifră: } 3",
+        "explanation": "Coborâm cifra unităților (5) și obținem 1025. Câte ori intră 283 în 1025?"
+      },
+      {
+        "latex": "176 < 283 \\checkmark",
+        "explanation": "Nu mai avem cifre de coborât. Restul este 176, care este mai mic decât 283."
+      },
+      {
+        "latex": "12345 : 283 = 43 \\text{ rest } 176",
+        "explanation": "Scriem rezultatul și verificăm prin relația de bază:"
+      },
+      {
+        "latex": "283 \\times 43 + 176 = 12169 + 176 = 12345 \\checkmark",
+        "explanation": "Verificare:"
+      }
+    ],
+    "problem": "Calculează 12345 : 283."
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "divisor": 283,
+      "dividend": 12345,
+      "show_remainder": true
+    },
+    "component": "long_division"
+  },
+  {
+    "text": "Restul trebuie să fie întotdeauna strict mai mic decât împărțitorul. Dacă restul găsit este mai mare sau egal cu împărțitorul, câtul ales la acel pas este prea mic — trebuie mărit cu 1 și recalculat.",
+    "type": "warning_box",
+    "title": "Atenție la verificarea restului!"
+  }
+]

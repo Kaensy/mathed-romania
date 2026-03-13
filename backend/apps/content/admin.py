@@ -76,7 +76,7 @@ class LessonAdmin(admin.ModelAdmin):
     list_display = ("__str__", "unit_display", "is_published", "exercise_count", "practice_minimum", "updated_at")
     list_filter = ("unit__grade", "unit", "is_published")
     list_editable = ("is_published",)
-    search_fields = ("title", "content")
+    search_fields = ("title",)
     inlines = [ExerciseInline]
     save_on_top = True  # Save button at top too — useful for long content
 
@@ -86,7 +86,7 @@ class LessonAdmin(admin.ModelAdmin):
         (
             "Lesson Content",
             {
-                "fields": ("content",),
+                "fields": ("blocks",),
                 "description": (
                     "Write lesson content here. Use $expression$ for inline math "
                     "and $$expression$$ for display math (KaTeX syntax). "

@@ -1,0 +1,184 @@
+[
+  {
+    "text": "Știai că populația României este de aproximativ 19.000.000 de locuitori? Cum scriem și citim un număr atât de mare corect?",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Numerele naturale se scriu cu ajutorul cifrelor arabe: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9.",
+    "type": "paragraph"
+  },
+  {
+    "text": "Poziția ocupată de fiecare cifră într-un număr reprezintă un anumit ordin: ordinul unităților, ordinul zecilor, ordinul sutelor, și tot așa.",
+    "type": "definition_box",
+    "title": "Definiție — Ordine"
+  },
+  {
+    "text": "Zece unități de un anumit ordin formează o unitate de ordin imediat superior: 10 unități formează o zece, 10 zeci formează o sută, 10 sute formează o mie, etc.",
+    "type": "observation_box",
+    "title": "Regula de bază"
+  },
+  {
+    "text": "Pentru a citi un număr natural, grupăm cifrele câte trei de la dreapta la stânga, formând clasele. Citim apoi de la stânga la dreapta.",
+    "type": "paragraph"
+  },
+  {
+    "rows": [
+      [
+        "S",
+        "Z",
+        "U",
+        "S",
+        "Z",
+        "U",
+        "S",
+        "Z",
+        "U",
+        "S",
+        "Z",
+        "U"
+      ],
+      [
+        " ",
+        "2",
+        "3",
+        "4",
+        "7",
+        "2",
+        "5",
+        "0",
+        "8",
+        "2",
+        "1",
+        "6"
+      ]
+    ],
+    "type": "merged_table",
+    "title": "Tabelul claselor și ordinelor",
+    "subheaders": [
+      "Sute de miliarde",
+      "Zeci de miliarde",
+      "Miliarde",
+      "Sute de milioane",
+      "Zeci de milioane",
+      "Milioane",
+      "Sute de mii",
+      "Zeci de mii",
+      "Mii",
+      "Sute",
+      "Zeci",
+      "Unități"
+    ],
+    "column_groups": [
+      {
+        "label": "Clasa miliardelor",
+        "columns": 3
+      },
+      {
+        "label": "Clasa milioanelor",
+        "columns": 3
+      },
+      {
+        "label": "Clasa miilor",
+        "columns": 3
+      },
+      {
+        "label": "Clasa unităților",
+        "columns": 3
+      }
+    ],
+    "footer_groups": [
+      {
+        "label": "Douăzeci și trei miliarde",
+        "columns": 3
+      },
+      {
+        "label": "Patru sute șaptezeci și două milioane",
+        "columns": 3
+      },
+      {
+        "label": "Cinci sute opt mii",
+        "columns": 3
+      },
+      {
+        "label": "Două sute șaisprezece",
+        "columns": 3
+      }
+    ]
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "23 \\quad | \\quad 472 \\quad | \\quad 508 \\quad | \\quad 216",
+        "explanation": "Grupăm cifrele câte trei de la dreapta la stânga:"
+      },
+      {
+        "explanation": "Identificăm clasele: 23 miliarde, 472 milioane, 508 mii, 216 unități."
+      },
+      {
+        "explanation": "Citim de la stânga la dreapta: douăzeci și trei miliarde, patru sute șaptezeci și două milioane, cinci sute opt mii, două sute șaisprezece."
+      }
+    ],
+    "problem": "Citește numărul 23.472.508.216."
+  },
+  {
+    "text": "Clasa care conține numai zerouri nu se pronunță. De exemplu, 1.000.305.429 se citește: un miliard, trei sute cinci mii, patru sute douăzeci și nouă.",
+    "type": "observation_box",
+    "title": "Observație"
+  },
+  {
+    "text": "Scrierea unui număr natural folosind cifrele arabe se numește sistem zecimal sau scrierea în baza zece.",
+    "type": "definition_box",
+    "title": "Sistemul zecimal"
+  },
+  {
+    "text": "Orice număr natural de două sau mai multe cifre se scrie în mod unic ca o sumă de produse între fiecare cifră și valoarea ordinului său.",
+    "type": "definition_box",
+    "title": "Forma canonică (descompunerea unui număr)"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "137 = 1 \\times 100 + 3 \\times 10 + 7 \\times 1",
+        "explanation": "Descompunem 137:"
+      },
+      {
+        "latex": "8086 = 8 \\times 1000 + 0 \\times 100 + 8 \\times 10 + 6 \\times 1",
+        "explanation": "Descompunem 8086 — atenție la cifra 0 de la ordinul sutelor:"
+      }
+    ],
+    "problem": "Scrie 137 și 8086 în formă canonică."
+  },
+  {
+    "type": "formula_card",
+    "latex": "\\overline{ab} = a \\times 10 + b \\times 1",
+    "title": "Forma canonică a unui număr de două cifre (a ≠ 0)"
+  },
+  {
+    "text": "De la 1 la n sunt n numere naturale. De la a la b inclusiv sunt b − a + 1 numere naturale.",
+    "type": "definition_box",
+    "title": "Numărul de numere naturale dintr-un interval"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "13 - 5 + 1 = 9 \\text{ numere naturale}",
+        "explanation": "Aplicăm formula b − a + 1:"
+      },
+      {
+        "explanation": "Verificăm numărând: 5, 6, 7, 8, 9, 10, 11, 12, 13 — într-adevăr 9 numere."
+      }
+    ],
+    "problem": "Câte numere naturale sunt de la 5 la 13 inclusiv?"
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "number": 23472508216,
+      "show_reading": true
+    },
+    "component": "place_value_table"
+  }
+]

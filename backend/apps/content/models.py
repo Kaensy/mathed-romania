@@ -1,17 +1,19 @@
 """
 Content models for MathEd Romania.
-Represents the curriculum hierarchy: Grade → Unit → Lesson → Exercise.
-Tests are per-unit and gate progression to the next unit.
+
+Hierarchy: Grade → Unit → Lesson → Exercise
+Each unit has one Test that gates progression to the next unit.
 """
 from django.db import models
 
 
 class Grade(models.Model):
-    """Top-level grouping. Grades 5-8."""
-
+    """
+    Top-level grouping (5, 6, 7, 8).
+    """
     number = models.PositiveSmallIntegerField(unique=True)
-    name = models.CharField(max_length=50)  # e.g., "Clasa a V-a"
-    is_active = models.BooleanField(default=False)
+    name = models.CharField(max_length=100)  # e.g. "Clasa a V-a"
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "grades"
@@ -27,10 +29,8 @@ class Grade(models.Model):
 
 class Unit(models.Model):
     """
-    Major curriculum unit within a grade.
-    e.g., "Numere Naturale", "Fractii Ordinare"
+    Chapter/unit within a grade. Sequential unlock between units.
     """
-
     grade = models.ForeignKey(Grade, on_delete=models.CASCADE, related_name="units")
     order = models.PositiveSmallIntegerField()
     title = models.CharField(max_length=200)
@@ -38,7 +38,7 @@ class Unit(models.Model):
     recommended_unlock_date = models.DateField(
         null=True,
         blank=True,
-        help_text="Default earliest date this unit becomes available",
+        help_text="Default earliest date this unit should unlock for students",
     )
     is_published = models.BooleanField(default=False)
 
@@ -58,23 +58,28 @@ class Unit(models.Model):
 class Lesson(models.Model):
     """
     Individual lesson within a unit.
-    Contains theory, worked examples, and links to exercises.
+    Content is stored as a structured JSON array of typed blocks.
+    See BLOCK_SCHEMA.md for the full block type specification.
     """
-
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="lessons")
     order = models.PositiveSmallIntegerField()
     title = models.CharField(max_length=200)
     summary = models.TextField(
         blank=True,
-        help_text="Short description shown in lesson lists",
+        help_text="Short description shown in lesson lists and cards",
     )
-    content = models.TextField(
-        help_text="Rich text with KaTeX math notation",
+    blocks = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Structured lesson content as an array of typed blocks. "
+            "See BLOCK_SCHEMA.md for the full specification."
+        ),
     )
     is_published = models.BooleanField(default=False)
     practice_minimum = models.PositiveSmallIntegerField(
         default=5,
-        help_text="Exercises to complete before next lesson unlocks",
+        help_text="Minimum exercises to complete before next lesson unlocks",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -97,12 +102,13 @@ class Exercise(models.Model):
     Exercise linked to a lesson. Template stored as JSONB for
     parameter randomization.
     """
-
     class ExerciseType(models.TextChoices):
         MULTIPLE_CHOICE = "multiple_choice", "Multiple Choice"
         FILL_BLANK = "fill_blank", "Fill in the Blank"
         EXPRESSION = "expression", "Expression Input"
         TRUE_FALSE = "true_false", "True/False"
+        DRAG_ORDER = "drag_order", "Drag to Order"
+        CLICK_SELECT = "click_select", "Click to Select"
 
     class Difficulty(models.TextChoices):
         EASY = "easy", "Easy"
@@ -130,7 +136,6 @@ class Test(models.Model):
     Unit evaluation test. Must be passed to unlock next unit.
     One test per unit.
     """
-
     unit = models.OneToOneField(Unit, on_delete=models.CASCADE, related_name="test")
     pass_threshold = models.PositiveSmallIntegerField(
         default=70,
@@ -163,7 +168,6 @@ class GlossaryTerm(models.Model):
     Mathematical term definitions, cross-referenced with content.
     Searchable by students, available offline.
     """
-
     term = models.CharField(max_length=200)
     definition = models.TextField()
     unit = models.ForeignKey(

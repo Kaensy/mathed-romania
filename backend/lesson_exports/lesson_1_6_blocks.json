@@ -1,0 +1,126 @@
+[
+  {
+    "text": "Ai 145 de lei și cheltuiești 13 lei. Câți lei îți rămân? Scăderea răspunde exact la acest tip de întrebare.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Numărul din care se scade se numește descăzut, iar cel care se scade se numește scăzător. Rezultatul obținut poartă numele de diferență.",
+    "type": "definition_box",
+    "title": "Definiție — Scăderea"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "explanation": "145 este descăzutul, 13 este scăzătorul, 132 este diferența — termenii scăderii."
+      }
+    ],
+    "problem": "Identifică termenii în operația: 145 − 13 = 132."
+  },
+  {
+    "text": "Diferența a două numere de aceeași paritate este un număr par. Diferența a două numere de parități diferite este un număr impar. Exemple: 5 − 3 = 2 (impar − impar = par), 17 − 6 = 11 (impar − par = impar).",
+    "type": "observation_box",
+    "title": "Paritatea diferenței"
+  },
+  {
+    "text": "Pentru a scădea două numere naturale, scădem unitățile de același ordin. Dacă nu avem suficiente unități, luăm o unitate de ordin imediat superior și o transformăm în zece unități de ordin imediat inferior (împrumut).",
+    "type": "definition_box",
+    "title": "Regula scăderii în coloană"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "explanation": "Scriem numerele unul sub celălalt și scădem coloană cu coloană de la dreapta la stânga, cu împrumut acolo unde este necesar."
+      },
+      {
+        "latex": "16 - 8 = 8",
+        "explanation": "Unitățile: 6 < 8, împrumutăm — 16 − 8 = 8."
+      },
+      {
+        "latex": "18 - 1 - 9 = 8",
+        "explanation": "Zecile: 8 − 1 (împrumut) = 7, dar 7 < 9, împrumutăm — 18 − 1 − 9 = 8."
+      },
+      {
+        "latex": "17 - 1 - 8 = 8",
+        "explanation": "Sutele: 7 − 1 (împrumut) = 6, dar 6 < 8, împrumutăm — 17 − 1 − 8 = 8."
+      },
+      {
+        "latex": "12 - 1 - 3 = 8",
+        "explanation": "Miile: 2 − 1 (împrumut) = 1, dar 1 < 3, împrumutăm — 12 − 1 − 3 = 8."
+      },
+      {
+        "latex": "16 - 1 - 9 = 6",
+        "explanation": "Zecile de mii: 6 − 1 (împrumut) = 5, dar 5 < 9, împrumutăm — 16 − 1 − 9 = 6."
+      },
+      {
+        "latex": "2 - 1 = 1",
+        "explanation": "Sutele de mii: 2 − 1 (împrumut) = 1."
+      },
+      {
+        "latex": "262786 - 93898 = 168888",
+        "explanation": "Rezultat:"
+      }
+    ],
+    "problem": "Calculează 262786 − 93898 în coloană."
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "operands": [
+        262786,
+        93898
+      ],
+      "operation": "subtraction"
+    },
+    "component": "column_arithmetic"
+  },
+  {
+    "text": "Descăzutul este întotdeauna mai mare decât scăzătorul (în mulțimea numerelor naturale). Scăderea numerelor naturale nu este comutativă și nici asociativă.",
+    "type": "observation_box",
+    "title": "Observații importante"
+  },
+  {
+    "text": "Corectitudinea unei scăderi se poate verifica în două moduri: printr-o altă scădere (descăzut − diferență = scăzător) sau prin adunare (scăzător + diferență = descăzut).",
+    "type": "definition_box",
+    "title": "Proba scăderii"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "130 - 115 = 15 \\checkmark",
+        "explanation": "Proba prin scădere: descăzut − diferență trebuie să dea scăzătorul."
+      },
+      {
+        "latex": "15 + 115 = 130 \\checkmark",
+        "explanation": "Proba prin adunare: scăzător + diferență trebuie să dea descăzutul."
+      }
+    ],
+    "problem": "Verifică prin probă că 130 − 15 = 115."
+  },
+  {
+    "text": "Când scăzătorul este o expresie între paranteze, aplicăm regulile: a − (b + c) = a − b − c, cu condiția a > b + c. Și: a − (b − c) = a − b + c, cu condiția a > b.",
+    "type": "definition_box",
+    "title": "Scăzătorul este o sumă sau o diferență"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "20 - (15 - 5) = 20 - 15 + 5",
+        "explanation": "Aplicăm regula a − (b − c) = a − b + c:"
+      },
+      {
+        "latex": "20 - 15 + 5 = 5 + 5 = 10",
+        "explanation": "Calculăm de la stânga la dreapta:"
+      }
+    ],
+    "problem": "Calculează 20 − (15 − 5)."
+  },
+  {
+    "text": "20 − (15 − 5) ≠ 20 − 15 − 5. Când deschidem paranteza precedată de minus, semnele din interior se schimbă: plus devine minus și minus devine plus.",
+    "type": "warning_box",
+    "title": "Atenție la paranteze!"
+  }
+]

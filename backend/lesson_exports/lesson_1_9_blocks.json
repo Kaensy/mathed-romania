@@ -1,0 +1,115 @@
+[
+  {
+    "text": "Ai 10 mere și vrei să le împarți în mod egal la 2 copii. Fiecăruia îi revin 5 mere. Câte mere am scăzut repetat? Exact 5 ori câte 2 — aceasta este împărțirea.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Împărțirea poate fi privită ca o scădere repetată. Numărul care se împarte se numește deîmpărțit, numărul la care se împarte se numește împărțitor, iar rezultatul se numește cât. Împărțirea exactă (cu rest 0) este operația inversă a înmulțirii.",
+    "type": "definition_box",
+    "title": "Definiție — Împărțirea exactă"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "10 - 2 - 2 - 2 - 2 - 2 = 0",
+        "explanation": "Scădem repetat pe 2 din 10 până ajungem la 0:"
+      },
+      {
+        "latex": "10 : 2 = 5",
+        "explanation": "Am scăzut pe 2 de 5 ori, deci câtul este 5. Deîmpărțitul este 10, împărțitorul este 2."
+      }
+    ],
+    "problem": "Explică împărțirea 10 : 2 = 5 ca scădere repetată."
+  },
+  {
+    "text": "Împărțirea la zero nu este definită — nu are sens să împărțim la zero. De aceea se pune condiția că împărțitorul să fie nenul: b ≠ 0.",
+    "type": "observation_box",
+    "title": "Împărțirea la zero nu are sens"
+  },
+  {
+    "text": "Corectitudinea unei împărțiri se poate verifica în două moduri: prin altă împărțire (deîmpărțit : cât = împărțitor) sau prin înmulțire (împărțitor × cât = deîmpărțit).",
+    "type": "definition_box",
+    "title": "Proba împărțirii exacte"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "10 : 5 = 2 \\checkmark",
+        "explanation": "Proba prin împărțire: deîmpărțit : cât trebuie să dea împărțitorul."
+      },
+      {
+        "latex": "2 \\times 5 = 10 \\checkmark",
+        "explanation": "Proba prin înmulțire: împărțitor × cât trebuie să dea deîmpărțitul."
+      }
+    ],
+    "problem": "Verifică prin probă că 10 : 2 = 5."
+  },
+  {
+    "type": "properties_list",
+    "title": "Proprietățile împărțirii exacte",
+    "properties": [
+      {
+        "name": "Egalitate",
+        "example": "$10 = 10 \\Rightarrow 10 : 2 = 10 : 2$",
+        "symbolic": "a = b \\Rightarrow a : m = b : m"
+      },
+      {
+        "name": "Inegalitate",
+        "example": "$4 < 8 \\Rightarrow 4 : 2 < 8 : 2$",
+        "symbolic": "a < b \\Rightarrow a : m < b : m"
+      },
+      {
+        "name": "Distributivitate față de adunare",
+        "example": "$(6 + 4) : 2 = 6 : 2 + 4 : 2 = 5$",
+        "symbolic": "(a + b) : m = a : m + b : m"
+      },
+      {
+        "name": "Distributivitate față de scădere",
+        "example": "$(8 - 4) : 2 = 8 : 2 - 4 : 2 = 2$",
+        "symbolic": "(a - b) : m = a : m - b : m"
+      },
+      {
+        "name": "Împărțirea lui 0",
+        "example": "$0 : 7 = 0$",
+        "symbolic": "0 : m = 0"
+      }
+    ]
+  },
+  {
+    "text": "Pentru a împărți un număr mare la un împărțitor, lucrăm cifră cu cifră de la stânga la dreapta. La fiecare pas determinăm câte ori intră împărțitorul în grupul curent de cifre, scriem acea cifră în cât, scădem produsul și coborâm următoarea cifră.",
+    "type": "definition_box",
+    "title": "Algoritmul împărțirii lungi"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "4 \\times 32 = 128, \\quad 158 - 128 = 30 < 32 \\Rightarrow \\text{prima cifră a câtului: } 4",
+        "explanation": "Deîmpărțitul este de ordinul zecilor de mii. Nu putem începe cu 1 (1 < 32), nici cu 15 (15 < 32), dar 158 > 32. Câte ori intră 32 în 158?"
+      },
+      {
+        "latex": "9 \\times 32 = 288, \\quad 304 - 288 = 16 < 32 \\Rightarrow \\text{a doua cifră a câtului: } 9",
+        "explanation": "Coborâm cifra zecilor (4) și obținem 304. Câte ori intră 32 în 304?"
+      },
+      {
+        "latex": "5 \\times 32 = 160, \\quad 160 - 160 = 0 \\Rightarrow \\text{a treia cifră a câtului: } 5",
+        "explanation": "Coborâm cifra unităților (0) și obținem 160. Câte ori intră 32 în 160?"
+      },
+      {
+        "latex": "15840 : 32 = 495",
+        "explanation": "Restul este 0, deci împărțirea este exactă:"
+      }
+    ],
+    "problem": "Calculează 15840 : 32."
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "divisor": 32,
+      "dividend": 15840
+    },
+    "component": "long_division"
+  }
+]

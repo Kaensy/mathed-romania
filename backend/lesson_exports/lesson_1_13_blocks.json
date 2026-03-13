@@ -1,0 +1,170 @@
+[
+  {
+    "text": "Care este mai mare: $2^{61}$ sau $3^{41}$? Amândouă sunt numere uriașe, imposibil de calculat direct. Există însă tehnici elegante de comparare fără calcule greoaie.",
+    "type": "real_world_box"
+  },
+  {
+    "type": "properties_list",
+    "title": "Regulile de comparare a puterilor",
+    "properties": [
+      {
+        "name": "Același exponent nenul",
+        "example": "$7^{29} > 3^{29}$ deoarece $7 > 3$",
+        "symbolic": "a > b \\Rightarrow a^n > b^n"
+      },
+      {
+        "name": "Aceeași bază (mai mare decât 1)",
+        "example": "$3^5 > 3^2$ deoarece $5 > 2$",
+        "symbolic": "m > n \\Rightarrow a^m > a^n \\; (a > 1)"
+      }
+    ]
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "8^{14} = (2^3)^{14} = 2^{42}",
+        "explanation": "Aducem la aceeași bază: $8 = 2^3$, deci $8^{14} = (2^3)^{14} = 2^{42}$."
+      },
+      {
+        "latex": "2^{40} < 2^{42} \\Rightarrow 2^{40} < 8^{14}",
+        "explanation": "Acum comparăm puteri cu aceeași bază: 40 < 42, deci:"
+      }
+    ],
+    "problem": "Compară $2^{40}$ și $8^{14}$."
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "7^{16} = 7^{8 \\times 2} = (7^2)^8 = 49^8",
+        "explanation": "Aducem la același exponent. Observăm că 16 = 8 × 2 și 24 = 8 × 3:"
+      },
+      {
+        "latex": "4^{24} = 4^{8 \\times 3} = (4^3)^8 = 64^8",
+        "explanation": ""
+      },
+      {
+        "latex": "49^8 < 64^8 \\Rightarrow 7^{16} < 4^{24}",
+        "explanation": "Acum comparăm puteri cu același exponent: 49 < 64, deci:"
+      }
+    ],
+    "problem": "Compară $7^{16}$ și $4^{24}$."
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "(2^3)^{20} < (3^2)^{20} \\Rightarrow 2^{60} < 3^{40}",
+        "explanation": "Plecăm de la relația $8 < 9$, adică $2^3 < 3^2$. Ridicăm la puterea 20:"
+      },
+      {
+        "latex": "2 \\times 2^{60} < 3 \\times 3^{40} \\Rightarrow 2^{61} < 3^{41}",
+        "explanation": "Înmulțim: $2^{61} = 2 \\times 2^{60}$ și $3^{41} = 3 \\times 3^{40}$. Deoarece $2 < 3$ și $2^{60} < 3^{40}$:"
+      }
+    ],
+    "problem": "Compară $2^{61}$ și $3^{41}$."
+  },
+  {
+    "type": "collapsible",
+    "title": "Relații utile pentru comparare (valabile pentru orice k ≥ 1)",
+    "blocks": [
+      {
+        "text": "Aceste inegalități se obțin ridicând la puterea k relații simple între baze.",
+        "type": "paragraph"
+      },
+      {
+        "type": "block_equation",
+        "latex": "2^{3k} < 3^{2k} \\quad (\\text{din } 8 < 9)"
+      },
+      {
+        "type": "block_equation",
+        "latex": "5^{2k} < 3^{3k} \\quad (\\text{din } 25 < 27)"
+      },
+      {
+        "type": "block_equation",
+        "latex": "3^{2k} < 2^{5k} \\quad (\\text{din } 9 < 32)"
+      },
+      {
+        "type": "block_equation",
+        "latex": "11^{2k} < 5^{3k} \\quad (\\text{din } 121 < 125)"
+      },
+      {
+        "type": "block_equation",
+        "latex": "3^{5k} < 2^{8k} \\quad (\\text{din } 243 < 256)"
+      },
+      {
+        "type": "block_equation",
+        "latex": "10^{3k} < 2^{10k} \\quad (\\text{din } 1000 < 1024)"
+      }
+    ]
+  },
+  {
+    "text": "Numerele naturale care pot fi scrise ca puterea a doua a unui număr natural se numesc pătrate perfecte. Exemple: $36 = 6^2$, $121 = 11^2$. Numerele naturale care pot fi scrise ca puterea a treia a unui număr natural se numesc cuburi perfecte. Exemple: $64 = 4^3$, $125 = 5^3$.",
+    "type": "definition_box",
+    "title": "Pătrate perfecte și cuburi perfecte"
+  },
+  {
+    "rows": [
+      [
+        "Ultima cifră a lui $a^2$",
+        "0",
+        "1",
+        "4",
+        "9",
+        "6",
+        "5",
+        "6",
+        "9",
+        "4",
+        "1"
+      ]
+    ],
+    "type": "summary_table",
+    "title": "Ultima cifră a lui $a^2$ — recunoașterea pătratelor perfecte",
+    "headers": [
+      "Ultima cifră a lui a",
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9"
+    ]
+  },
+  {
+    "type": "properties_list",
+    "title": "Proprietăți ale pătratelor perfecte",
+    "properties": [
+      {
+        "name": "Exponent par",
+        "example": "$7^{12} = (7^6)^2$ — patrat perfect",
+        "symbolic": "a^{2k} = (a^k)^2"
+      },
+      {
+        "name": "Exponent impar, bază scribilă cu exp. par",
+        "example": "$16^7$ este patrat perfect",
+        "symbolic": "16^7 = (2^4)^7 = 2^{28} = (2^{14})^2"
+      },
+      {
+        "name": "Produs de pătrate perfecte",
+        "example": "$121 \\times 64 \\times 9 = (11 \\times 8 \\times 3)^2$ — p.p.",
+        "symbolic": "a^2 \\times b^2 = (ab)^2"
+      },
+      {
+        "name": "Ultima cifră 2, 3, 7 sau 8",
+        "example": "$1275943$ nu e p.p. (ultima cifră 3)",
+        "symbolic": "\\Rightarrow \\text{nu este patrat perfect}"
+      }
+    ]
+  },
+  {
+    "text": "Orice pătrat perfect are ultima cifră 0, 1, 4, 5, 6 sau 9. Dacă un număr are ultima cifră 2, 3, 7 sau 8, cu siguranță nu este pătrat perfect. Dacă un număr se află strict între două pătrate perfecte consecutive, nu este pătrat perfect. Exemplu: 75 nu este p.p. deoarece $8^2 = 64 < 75 < 81 = 9^2$.",
+    "type": "observation_box",
+    "title": "Test rapid pentru pătrate perfecte"
+  }
+]

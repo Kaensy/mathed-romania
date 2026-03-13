@@ -1,0 +1,88 @@
+[
+  {
+    "text": "Când aduni prețurile produselor dintr-un coș de cumpărături, folosești adunarea numerelor naturale. Dar cum funcționează aceasta pentru numere mari, cu transport de cifre?",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Numerele care se adună se numesc termeni, iar rezultatul obținut se numește sumă. Suma a două numere naturale este tot un număr natural.",
+    "type": "definition_box",
+    "title": "Definiție — Adunarea"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "explanation": "32 și 15 sunt termenii adunării — numerele care se adună. 47 este suma — rezultatul obținut."
+      }
+    ],
+    "problem": "Identifică termenii și suma în operația: 32 + 15 = 47."
+  },
+  {
+    "text": "Pentru a aduna două numere naturale, adunăm unitățile de același ordin și ținem cont că zece unități de un anumit ordin fac o unitate de ordin imediat superior (transport).",
+    "type": "definition_box",
+    "title": "Regula adunării în coloană"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "145 + 67 = \\;?",
+        "explanation": "Scriem numerele unul sub celălalt, aliniind unitățile, zecile, sutele."
+      },
+      {
+        "latex": "5 + 7 = 12 \\Rightarrow \\text{scriem } 2, \\text{ transport } 1",
+        "explanation": "Pasul 1 — unitățile: 5 + 7 = 12. Scriem 2, transportăm 1 la zeci."
+      },
+      {
+        "latex": "4 + 6 + 1 = 11 \\Rightarrow \\text{scriem } 1, \\text{ transport } 1",
+        "explanation": "Pasul 2 — zecile: 4 + 6 + 1 (transport) = 11. Scriem 1, transportăm 1 la sute."
+      },
+      {
+        "latex": "1 + 0 + 1 = 2",
+        "explanation": "Pasul 3 — sutele: 1 + 0 + 1 (transport) = 2. Scriem 2."
+      },
+      {
+        "latex": "145 + 67 = 212",
+        "explanation": "Rezultat:"
+      }
+    ],
+    "problem": "Calculează 145 + 67 în coloană."
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "operands": [
+        145,
+        67
+      ],
+      "operation": "addition"
+    },
+    "component": "column_arithmetic"
+  },
+  {
+    "type": "properties_list",
+    "title": "Proprietățile adunării",
+    "properties": [
+      {
+        "name": "Comutativitate",
+        "example": "$32 + 15 = 15 + 32 = 47$",
+        "symbolic": "a + b = b + a"
+      },
+      {
+        "name": "Asociativitate",
+        "example": "$(32 + 15) + 10 = 32 + (15 + 10) = 57$",
+        "symbolic": "(a + b) + c = a + (b + c)"
+      },
+      {
+        "name": "Element neutru",
+        "example": "$15 + 0 = 0 + 15 = 15$",
+        "symbolic": "a + 0 = 0 + a = a"
+      }
+    ]
+  },
+  {
+    "text": "Suma a două numere naturale este întotdeauna un număr natural. Adunarea este închisă față de mulțimea numerelor naturale.",
+    "type": "observation_box",
+    "title": "Observație"
+  }
+]

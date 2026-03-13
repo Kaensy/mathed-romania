@@ -1,0 +1,191 @@
+[
+  {
+    "text": "Cum știm că 5 este mai mic decât 8? Pe o riglă, numerele cresc de la stânga la dreapta — exact ca pe axa numerelor.",
+    "type": "real_world_box"
+  },
+  {
+    "text": "Axa numerelor este o dreaptă pe care se fixează: un punct numit origine, un sens indicat de o săgeată, și un segment numit unitate de măsură.",
+    "type": "definition_box",
+    "title": "Definiție — Axa numerelor"
+  },
+  {
+    "text": "Fiecărui număr natural îi corespunde pe axă un punct. Numărul este coordonata punctului. Originea are coordonata 0 (zero).",
+    "type": "paragraph"
+  },
+  {
+    "text": "Numerele cresc de la stânga la dreapta pe axă. Cu cât un punct este mai la dreapta, cu atât coordonata sa este mai mare.",
+    "type": "observation_box",
+    "title": "De reținut"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "O(0),\\; A(1),\\; B(2),\\; C(3),\\; D(4),\\; E(5)",
+        "explanation": "Numărăm unitățile de măsură de la origine (O) până la B."
+      },
+      {
+        "explanation": "Punctul B se află la distanța 2 față de origine. Vom nota B(2)."
+      }
+    ],
+    "problem": "Pe axa de mai jos sunt marcate punctele O, A, B, C, D, E. Care este coordonata punctului B?"
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "max": 5,
+      "min": 0,
+      "points": [
+        {
+          "label": "O",
+          "value": 0
+        },
+        {
+          "label": "A",
+          "value": 1
+        },
+        {
+          "label": "B",
+          "value": 2
+        },
+        {
+          "label": "C",
+          "value": 3
+        },
+        {
+          "label": "D",
+          "value": 4
+        },
+        {
+          "label": "E",
+          "value": 5
+        }
+      ]
+    },
+    "component": "number_line"
+  },
+  {
+    "text": "A compara două numere naturale a și b înseamnă a stabili dacă a = b (a este egal cu b), a < b (a este mai mic decât b), sau a > b (a este mai mare decât b).",
+    "type": "definition_box",
+    "title": "Compararea numerelor naturale"
+  },
+  {
+    "type": "properties_list",
+    "title": "Semnele de comparare",
+    "properties": [
+      {
+        "name": "Egal",
+        "example": "$3 = 3$",
+        "symbolic": "a = b"
+      },
+      {
+        "name": "Mai mic",
+        "example": "$3 < 7$",
+        "symbolic": "a < b"
+      },
+      {
+        "name": "Mai mare",
+        "example": "$7 > 3$",
+        "symbolic": "a > b"
+      },
+      {
+        "name": "Mai mic sau egal",
+        "example": "$3 \\leq 3$, $\\; 3 \\leq 7$",
+        "symbolic": "a \\leq b"
+      },
+      {
+        "name": "Mai mare sau egal",
+        "example": "$7 \\geq 7$, $\\; 7 \\geq 3$",
+        "symbolic": "a \\geq b"
+      }
+    ]
+  },
+  {
+    "text": "Dintre două numere naturale care au număr diferit de cifre, este mai mare numărul care are mai multe cifre.",
+    "type": "definition_box",
+    "title": "Regula 1 — Număr diferit de cifre"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "latex": "18073 \\text{ are 5 cifre}, \\quad 9542 \\text{ are 4 cifre}",
+        "explanation": "Numărăm cifrele fiecărui număr:"
+      },
+      {
+        "latex": "18073 > 9542",
+        "explanation": "Deoarece 5 > 4, numărul cu mai multe cifre este mai mare:"
+      }
+    ],
+    "problem": "Compară numerele 18073 și 9542."
+  },
+  {
+    "text": "Pentru a compara două numere care au același număr de cifre, comparăm pe rând cifrele de același ordin de la stânga la dreapta. Numărul mai mare este cel la care întâlnim prima cifră mai mare.",
+    "type": "definition_box",
+    "title": "Regula 2 — Același număr de cifre"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "explanation": "Ambele numere au 4 cifre. Comparăm de la stânga la dreapta:"
+      },
+      {
+        "latex": "8 = 8",
+        "explanation": "Cifrele miilor: 8 = 8 — egale, continuăm."
+      },
+      {
+        "latex": "5 = 5",
+        "explanation": "Cifrele sutelor: 5 = 5 — egale, continuăm."
+      },
+      {
+        "latex": "6 > 4",
+        "explanation": "Cifrele zecilor: 6 > 4 — am găsit prima cifră diferită!"
+      },
+      {
+        "latex": "8567 > 8549",
+        "explanation": "Prin urmare numărul mai mare este 8567:"
+      }
+    ],
+    "problem": "Compară numerele 8567 și 8549."
+  },
+  {
+    "type": "interactive",
+    "config": {
+      "mode": "digit_comparison",
+      "numbers": [
+        8567,
+        8549
+      ]
+    },
+    "component": "comparison_sorter"
+  },
+  {
+    "text": "A ordona crescător mai multe numere naturale înseamnă a le scrie de la cel mai mic la cel mai mare. A ordona descrescător înseamnă a le scrie de la cel mai mare la cel mai mic.",
+    "type": "definition_box",
+    "title": "Ordonarea numerelor naturale"
+  },
+  {
+    "type": "worked_example",
+    "steps": [
+      {
+        "explanation": "Comparăm numărul de cifre: 304 și 340 au 3 cifre, 4300 și 3400 au 4 cifre. Cele cu 3 cifre sunt mai mici."
+      },
+      {
+        "explanation": "Ordonăm cele cu 3 cifre: 304 vs 340 — cifrele sutelor sunt egale (3 = 3), comparăm zecile: 0 < 4, deci 304 < 340."
+      },
+      {
+        "explanation": "Ordonăm cele cu 4 cifre: 3400 vs 4300 — cifrele miilor: 3 < 4, deci 3400 < 4300."
+      },
+      {
+        "latex": "304 < 340 < 3400 < 4300",
+        "explanation": "Ordinea crescătoare:"
+      },
+      {
+        "latex": "4300 > 3400 > 340 > 304",
+        "explanation": "Ordinea descrescătoare:"
+      }
+    ],
+    "problem": "Ordonează crescător și descrescător numerele: 304, 4300, 340, 3400."
+  }
+]

@@ -7,6 +7,8 @@ import DashboardPage from "@/pages/DashboardPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import ConsentApprovePage from "@/pages/ConsentApprovePage";
+import LessonViewer from "@/components/lesson/LessonViewer";
+import GradePage from "@/pages/GradePage";
 
 /**
  * Redirects authenticated users away from auth pages (login, register).
@@ -30,7 +32,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  return (
+    return (
     <Routes>
       {/* Public routes — redirect to dashboard if already logged in */}
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -47,7 +49,9 @@ function AppRoutes() {
             <DashboardPage />
           </ProtectedRoute>
         }
-      />
+            />
+      <Route path="/lesson/:lessonId" element={ <ProtectedRoute> <LessonViewer /> </ProtectedRoute> } />
+      <Route path="/grade/:gradeNumber" element={<ProtectedRoute> <GradePage /> </ProtectedRoute> } />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
