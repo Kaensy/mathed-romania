@@ -15,10 +15,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.content.models import Exercise, Lesson
-from apps.progress.models import ExerciseAttempt, LessonProgress
+from apps.progress.models import ExerciseAttempt, LessonProgress, TestAttempt
 from apps.progress.exercise_engine import decode_instance_token, generate_instance
 from apps.progress.grading import grade_attempt
 from apps.progress.serializers import AttemptSubmitSerializer, DashboardSerializer
+
 
 
 # ─── Lesson open / complete ───────────────────────────────────────────────────
@@ -116,23 +117,206 @@ class LessonCompleteView(APIView):
             "completed_at": progress.completed_at,
         })
 
-
-# ─── Exercise serving ─────────────────────────────────────────────────────────
-
-class LessonPracticeView(APIView):
+class LessonCategoriesView(APIView):
     """
-    GET /api/v1/progress/lessons/<lesson_id>/practice/?count=5
+    GET /api/v1/progress/lessons/<lesson_id>/categories/
 
-    Returns `count` randomized exercise instances for the given lesson.
-    Each instance has an `instance_token` that must be echoed back
-    when submitting an attempt.
-
-    Default count: 5. Max count: 20.
+    Returns all exercise categories for a lesson, with the student's
+    attempt history and best session score (best X out of 5) per category.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, lesson_id):
+        from apps.content.models import Exercise, Lesson
+        from django.db.models import Count, Q
+
+        try:
+            lesson = Lesson.objects.get(id=lesson_id, is_published=True)
+        except Lesson.DoesNotExist:
+            return Response({"error": "Lecția nu există."}, status=status.HTTP_404_NOT_FOUND)
+
+        exercises = Exercise.objects.filter(lesson=lesson, is_active=True)
+
+        # Group exercises by category
+        category_map: dict[str, list] = {}
+        for ex in exercises:
+            cat = ex.category or ""
+            if cat not in category_map:
+                category_map[cat] = []
+            category_map[cat].append(ex.id)
+
+        if not category_map:
+            return Response({
+                "lesson_id": lesson_id,
+                "lesson_title": lesson.title,
+                "categories": [],
+            })
+
+        # Get all attempts for this lesson's exercises by this student
+        all_attempts = ExerciseAttempt.objects.filter(
+            student=request.user,
+            exercise__lesson=lesson,
+        ).values("exercise__category", "is_correct", "attempted_at").order_by("attempted_at")
+
+        # Build per-category stats
+        from collections import defaultdict
+        cat_correct: dict[str, int] = defaultdict(int)
+        cat_total: dict[str, int] = defaultdict(int)
+        # Track chronological correct/incorrect per category for best session
+        cat_attempts_timeline: dict[str, list] = defaultdict(list)
+
+        for attempt in all_attempts:
+            cat = attempt["exercise__category"] or ""
+            cat_total[cat] += 1
+            if attempt["is_correct"]:
+                cat_correct[cat] += 1
+            cat_attempts_timeline[cat].append(attempt["is_correct"])
+
+        # Best session score: sliding window of 5, best consecutive 5
+        def best_session_of_5(timeline: list) -> int | None:
+            if not timeline:
+                return None
+            if len(timeline) < 5:
+                return sum(timeline)
+            best = 0
+            for i in range(len(timeline) - 4):
+                window = sum(timeline[i:i+5])
+                if window > best:
+                    best = window
+            return best
+
+        # Build response
+        categories = []
+        for cat, ex_ids in category_map.items():
+            label = cat if cat else "Toate exercițiile"
+            categories.append({
+                "category": cat,
+                "label": label,
+                "exercise_count": len(ex_ids),
+                "correct_attempts": cat_correct[cat],
+                "total_attempts": cat_total[cat],
+                "best_session_score": best_session_of_5(cat_attempts_timeline[cat]),
+            })
+
+        # Sort: uncategorized last, then alphabetical
+        categories.sort(key=lambda c: ("" if c["category"] else "zzz", c["label"]))
+
+        return Response({
+            "lesson_id": lesson_id,
+            "lesson_title": lesson.title,
+            "categories": categories,
+        })
+
+
+# ─── Exercise serving ─────────────────────────────────────────────────────────
+
+class LessonCategoriesView(APIView):
+    """
+    GET /api/v1/progress/lessons/<lesson_id>/categories/
+
+    Returns all exercise categories for a lesson, with the student's
+    attempt history and best session score (best X out of 5) per category.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, lesson_id):
+        from apps.content.models import Exercise, Lesson
+        from django.db.models import Count, Q
+
+        try:
+            lesson = Lesson.objects.get(id=lesson_id, is_published=True)
+        except Lesson.DoesNotExist:
+            return Response({"error": "Lecția nu există."}, status=status.HTTP_404_NOT_FOUND)
+
+        exercises = Exercise.objects.filter(lesson=lesson, is_active=True)
+
+        # Group exercises by category
+        category_map: dict[str, list] = {}
+        for ex in exercises:
+            cat = ex.category or ""
+            if cat not in category_map:
+                category_map[cat] = []
+            category_map[cat].append(ex.id)
+
+        if not category_map:
+            return Response({
+                "lesson_id": lesson_id,
+                "lesson_title": lesson.title,
+                "categories": [],
+            })
+
+        # Get all attempts for this lesson's exercises by this student
+        all_attempts = ExerciseAttempt.objects.filter(
+            student=request.user,
+            exercise__lesson=lesson,
+        ).values("exercise__category", "is_correct", "attempted_at").order_by("attempted_at")
+
+        # Build per-category stats
+        from collections import defaultdict
+        cat_correct: dict[str, int] = defaultdict(int)
+        cat_total: dict[str, int] = defaultdict(int)
+        # Track chronological correct/incorrect per category for best session
+        cat_attempts_timeline: dict[str, list] = defaultdict(list)
+
+        for attempt in all_attempts:
+            cat = attempt["exercise__category"] or ""
+            cat_total[cat] += 1
+            if attempt["is_correct"]:
+                cat_correct[cat] += 1
+            cat_attempts_timeline[cat].append(attempt["is_correct"])
+
+        # Best session score: sliding window of 5, best consecutive 5
+        def best_session_of_5(timeline: list) -> int | None:
+            if not timeline:
+                return None
+            if len(timeline) < 5:
+                return sum(timeline)
+            best = 0
+            for i in range(len(timeline) - 4):
+                window = sum(timeline[i:i + 5])
+                if window > best:
+                    best = window
+            return best
+
+        # Build response
+        categories = []
+        for cat, ex_ids in category_map.items():
+            label = cat if cat else "Toate exercițiile"
+            categories.append({
+                "category": cat,
+                "label": label,
+                "exercise_count": len(ex_ids),
+                "correct_attempts": cat_correct[cat],
+                "total_attempts": cat_total[cat],
+                "best_session_score": best_session_of_5(cat_attempts_timeline[cat]),
+            })
+
+        # Sort: uncategorized last, then alphabetical
+        categories.sort(key=lambda c: ("" if c["category"] else "zzz", c["label"]))
+
+        return Response({
+            "lesson_id": lesson_id,
+            "lesson_title": lesson.title,
+            "categories": categories,
+        })
+
+
+# ─── 2. Replace LessonPracticeView with this version ─────────────────────────
+#       (adds ?category= filtering)
+
+class LessonPracticeView(APIView):
+    """
+    GET /api/v1/progress/lessons/<lesson_id>/practice/?count=5&category=expanded_form
+
+    Returns randomized exercise instances for the given lesson.
+    Optional ?category= filters to a specific exercise category.
+    Default count: 5. Max count: 20.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, lesson_id):
+        from apps.content.models import Lesson
+
         try:
             lesson = Lesson.objects.prefetch_related("exercises").get(
                 id=lesson_id, is_published=True
@@ -140,10 +324,17 @@ class LessonPracticeView(APIView):
         except Lesson.DoesNotExist:
             return Response({"error": "Lecția nu există."}, status=status.HTTP_404_NOT_FOUND)
 
-        exercises = list(lesson.exercises.filter(is_active=True))
+        category = request.query_params.get("category", None)
+
+        qs = lesson.exercises.filter(is_active=True)
+        if category is not None:
+            # Empty string means "uncategorized"
+            qs = qs.filter(category=category)
+
+        exercises = list(qs)
         if not exercises:
             return Response(
-                {"error": "Această lecție nu are exerciții active."},
+                {"error": "Această lecție nu are exerciții active pentru categoria selectată."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -152,19 +343,18 @@ class LessonPracticeView(APIView):
         except (ValueError, TypeError):
             count = 5
 
-        # Sample exercises (with replacement if fewer available than requested)
         import random
         if len(exercises) >= count:
             selected = random.sample(exercises, count)
         else:
             selected = random.choices(exercises, k=count)
 
+        from apps.progress.exercise_engine import generate_instance
         instances = []
         for exercise in selected:
             try:
                 instances.append(generate_instance(exercise))
-            except Exception as exc:  # noqa: BLE001
-                # Skip malformed templates rather than crashing the whole request
+            except Exception:
                 continue
 
         return Response({

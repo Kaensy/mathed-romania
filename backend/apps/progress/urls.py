@@ -10,12 +10,14 @@ from .views import (
     TestAnswerView,
     TestFinishView,
     TestResultView,
+    LessonCategoriesView,
 )
 
 urlpatterns = [
     # Lesson progress
     path("lessons/<int:lesson_id>/open/", LessonOpenView.as_view(), name="lesson_open"),
     path("lessons/<int:lesson_id>/complete/", LessonCompleteView.as_view(), name="lesson_complete"),
+    path("lessons/<int:lesson_id>/categories/", LessonCategoriesView.as_view(), name="lesson_categories"),
 
     # Practice
     path("lessons/<int:lesson_id>/practice/", LessonPracticeView.as_view(), name="lesson_practice"),

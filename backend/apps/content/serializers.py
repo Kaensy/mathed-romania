@@ -22,21 +22,33 @@ class GlossaryTermSerializer(serializers.ModelSerializer):
 
 
 class LessonListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for lesson lists — no blocks content."""
-
     exercise_count = serializers.SerializerMethodField()
+    is_locked = serializers.SerializerMethodField()
+    lesson_test_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Lesson
-        fields = ["id", "order", "title", "summary", "practice_minimum", "exercise_count"]
+        fields = ["id", "order", "title", "summary", "practice_minimum",
+                  "exercise_count", "is_locked", "lesson_test_id"]
 
     def get_exercise_count(self, obj):
         return obj.exercises.filter(is_active=True).count()
+
+    def get_is_locked(self, obj):
+        unlock_map = self.context.get("unlock_map", {})
+        return not unlock_map.get(obj.id, True)
+
+    def get_lesson_test_id(self, obj):
+        try:
+            return obj.test.id if obj.test.is_published else None
+        except Exception:
+            return None
 
 
 class LessonDetailSerializer(serializers.ModelSerializer):
     """Full lesson with blocks and exercises."""
 
+    lesson_test_id = serializers.SerializerMethodField()
     exercises = ExerciseSerializer(many=True, source="active_exercises")
     glossary_terms = GlossaryTermSerializer(many=True, read_only=True)
     unit_id = serializers.IntegerField(source="unit.id", read_only=True)
@@ -66,7 +78,14 @@ class LessonDetailSerializer(serializers.ModelSerializer):
             "exercises",
             "glossary_terms",
             "updated_at",
+            "lesson_test_id",
         ]
+
+    def get_lesson_test_id(self, obj):
+        try:
+            return obj.test.id if obj.test.is_published else None
+        except Exception:
+            return None
 
     def get_prev_lesson_id(self, obj):
         prev = (
@@ -92,7 +111,7 @@ class LessonDetailSerializer(serializers.ModelSerializer):
 class TestSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
-        fields = ["id", "pass_threshold", "time_limit_minutes", "exercise_count"]
+        fields = ["id", "scope", "pass_threshold", "time_limit_minutes", "composition"]
 
 
 class UnitListSerializer(serializers.ModelSerializer):
@@ -115,18 +134,32 @@ class UnitListSerializer(serializers.ModelSerializer):
             "test",
         ]
 
+    def get_lessons(self, obj):
+        lessons = obj.published_lessons
+        return LessonListSerializer(
+            lessons,
+            many=True,
+            context=self.context,
+        ).data
+
     def get_lesson_count(self, obj):
         return obj.lessons.filter(is_published=True).count()
 
 
 class GradeDetailSerializer(serializers.ModelSerializer):
-    """Grade with all its published units."""
-
-    units = UnitListSerializer(many=True, source="published_units")
+    units = serializers.SerializerMethodField()
 
     class Meta:
         model = Grade
         fields = ["id", "number", "name", "units"]
+
+    def get_units(self, obj):
+        units = obj.published_units
+        return UnitListSerializer(
+            units,
+            many=True,
+            context=self.context,
+        ).data
 
 
 class GradeListSerializer(serializers.ModelSerializer):

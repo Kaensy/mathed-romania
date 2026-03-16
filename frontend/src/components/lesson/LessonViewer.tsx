@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ArrowLeft, PenLine } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, PenLine, ClipboardList  } from "lucide-react";
 import { BlockRenderer } from "./Blocks";
 import type { LessonDetail } from "@/types/lesson";
 import api from "@/api/client";
@@ -24,10 +24,16 @@ export default function LessonViewer() {
     setError(null);
 
     api
-      .get<LessonDetail>(`/content/lessons/${lessonId}/`)
-      .then((res) => setLesson(res.data))
-      .catch(() => setError("Lecția nu a putut fi încărcată. Încearcă din nou."))
-      .finally(() => setLoading(false));
+  .get<LessonDetail>(`/content/lessons/${lessonId}/`)
+  .then((res) => setLesson(res.data))
+  .catch((err) => {
+    if (err.response?.status === 403) {
+      navigate("/dashboard", { replace: true });
+    } else {
+      setError("Lecția nu a putut fi încărcată. Încearcă din nou.");
+    }
+  })
+  .finally(() => setLoading(false));
   }, [lessonId]);
 
   // Scroll to top when lesson changes
@@ -127,10 +133,21 @@ export default function LessonViewer() {
               {/* Bottom navigation */}
               <div className="mt-12 pt-6 border-t border-gray-200 space-y-4">
 
+                  {lesson.lesson_test_id && (
+  <Link
+    to={`/test/${lesson.lesson_test_id}`}
+    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
+      bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors"
+  >
+    <ClipboardList className="w-4 h-4" />
+    Susține testul
+  </Link>
+)}
+
                   {/* Practice button — shown if lesson has exercises */}
                   {lesson.exercises.length > 0 && (
                       <Link
-                          to={`/lesson/${lessonId}/practice`}
+                          to={`/lesson/${lessonId}/exercises`}
                           className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
         bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
                       >

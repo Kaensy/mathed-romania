@@ -10,6 +10,8 @@ import ConsentApprovePage from "@/pages/ConsentApprovePage";
 import LessonViewer from "@/components/lesson/LessonViewer";
 import GradePage from "@/pages/GradePage";
 import PracticePage from "@/pages/PracticePage"
+import TestPage from "@/pages/TestPage";
+import ExerciseHubPage from "@/pages/ExerciseHubPage";
 
 /**
  * Redirects authenticated users away from auth pages (login, register).
@@ -54,6 +56,8 @@ function AppRoutes() {
       <Route path="/lesson/:lessonId" element={ <ProtectedRoute> <LessonViewer /> </ProtectedRoute> } />
       <Route path="/grade/:gradeNumber" element={ <ProtectedRoute> <GradePage /> </ProtectedRoute> } />
       <Route path="/lesson/:lessonId/practice" element={ <ProtectedRoute><PracticePage /></ProtectedRoute>} />
+      <Route path="/test/:testId" element={<ProtectedRoute><TestPage /></ProtectedRoute>} />
+      <Route path="/lesson/:lessonId/exercises" element={<ProtectedRoute><ExerciseHubPage /></ProtectedRoute>} />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

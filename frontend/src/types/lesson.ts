@@ -140,6 +140,8 @@ export interface LessonListItem {
   summary: string;
   practice_minimum: number;
   exercise_count: number;
+  is_locked: boolean;
+  lesson_test_id: number | null;
 }
 
 export interface LessonDetail {
@@ -158,6 +160,7 @@ export interface LessonDetail {
   exercises: Exercise[];
   glossary_terms: GlossaryTerm[];
   updated_at: string;
+  lesson_test_id: number | null;
 }
 
 export interface Exercise {

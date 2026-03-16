@@ -4,14 +4,13 @@
  * Route: /lesson/:lessonId/practice
  */
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle, XCircle, ChevronRight, Trophy, RotateCcw } from "lucide-react";
 import api from "@/api/client";
 import { InlineMath, BlockMath } from "@/lib/math";
 import type {
   AttemptResult,
   ExerciseInstance,
-  ExerciseOption,
   PracticeSession,
 } from "@/types/progress";
 
@@ -21,6 +20,9 @@ export default function PracticePage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
 
+  const [searchParams] = useSearchParams();
+  const category = searchParams.get("category");
+
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -28,12 +30,20 @@ export default function PracticePage() {
   const [correctCount, setCorrectCount] = useState(0);
   const [finished, setFinished] = useState(false);
 
+  const [questionResults, setQuestionResults] = useState<{
+  exercise: ExerciseInstance;
+  is_correct: boolean;
+  answer: string | string[];
+}[]>([]);
+
   const fetchSession = () => {
     if (!lessonId) return;
     setLoading(true);
     setError(null);
     api
-      .get<PracticeSession>(`/progress/lessons/${lessonId}/practice/?count=10`)
+      .get<PracticeSession>(
+  `/progress/lessons/${lessonId}/practice/?count=5${category !== null ? `&category=${encodeURIComponent(category)}` : ""}`
+)
       .then((res) => setSession(res.data))
       .catch(() => setError("Nu am putut încărca exercițiile. Încearcă din nou."))
       .finally(() => setLoading(false));
@@ -41,40 +51,21 @@ export default function PracticePage() {
 
   useEffect(() => { fetchSession(); }, [lessonId]);
 
-  const handleAnswerResult = (isCorrect: boolean) => {
-    if (isCorrect) {
-      const newCount = correctCount + 1;
-      setCorrectCount(newCount);
-      const minimum = session?.practice_minimum ?? 5;
-      if (newCount >= minimum && currentIndex >= (session?.exercises.length ?? 0) - 1) {
-        setFinished(true);
-        return;
-      }
-    }
-  };
+  const handleAnswerResult = (isCorrect: boolean, exercise: ExerciseInstance, answer: string | string[]) => {
+  setQuestionResults((prev) => [...prev, { exercise, is_correct: isCorrect, answer }]);
+  if (isCorrect) {
+    setCorrectCount((prev) => prev + 1);
+  }
+};
 
   const handleNext = () => {
-    const minimum = session?.practice_minimum ?? 5;
-    if (currentIndex + 1 >= (session?.exercises.length ?? 0)) {
-      if (correctCount >= minimum) {
-        setFinished(true);
-      } else {
-        fetchSession();
-        setCurrentIndex(0);
-      }
-      return;
-    }
-    setCurrentIndex((i) => i + 1);
-  };
-
-  const handleComplete = async () => {
-    try {
-      await api.post(`/progress/lessons/${lessonId}/complete/`);
-    } catch {
-      // Best-effort
-    }
-    navigate(`/lesson/${lessonId}`);
-  };
+  const nextIndex = currentIndex + 1;
+  if (nextIndex >= (session?.exercises.length ?? 0)) {
+    setFinished(true);
+    return;
+  }
+  setCurrentIndex(nextIndex);
+};
 
   if (loading) return <PracticeSkeleton />;
   if (error) return <PracticeError message={error} onRetry={fetchSession} />;
@@ -94,18 +85,19 @@ export default function PracticePage() {
   if (finished) {
     return (
       <CompletionScreen
-        correctCount={correctCount}
-        total={session.exercises.length}
-        minimum={session.practice_minimum}
-        onComplete={handleComplete}
-        onRetry={() => { fetchSession(); setCurrentIndex(0); setCorrectCount(0); setFinished(false); }}
-        lessonId={lessonId!}
-      />
+  correctCount={correctCount}
+  total={session.exercises.length}
+  questionResults={questionResults}
+  lessonId={lessonId!}
+  onRetry={() => { fetchSession(); setCurrentIndex(0); setCorrectCount(0); setFinished(false); setQuestionResults([]); }}
+/>
     );
   }
 
   const exercise = session.exercises[currentIndex];
   const minimum = session.practice_minimum;
+
+  if (!exercise) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,24 +105,23 @@ export default function PracticePage() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
           <Link
-            to={`/lesson/${lessonId}`}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
+              to={`/lesson/${lessonId}`}
+              className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4"/>
             <span>Înapoi la lecție</span>
           </Link>
-          <div className="flex-1" />
+          <div className="flex-1"/>
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span className="font-medium text-indigo-600">{correctCount}</span>
+            <span className="font-medium text-indigo-600">{currentIndex + 1}</span>
             <span>/</span>
-            <span>{minimum}</span>
-            <span className="hidden sm:inline text-gray-400">corecte</span>
+            <span>{session.exercises.length}</span>
           </div>
         </div>
         <div className="h-1 bg-gray-100">
           <div
-            className="h-1 bg-indigo-500 transition-all duration-500"
-            style={{ width: `${Math.min((correctCount / minimum) * 100, 100)}%` }}
+              className="h-1 bg-indigo-500 transition-all duration-500"
+              style={{ width: `${((currentIndex + 1) / session.exercises.length) * 100}%` }}
           />
         </div>
       </div>
@@ -156,7 +147,7 @@ export default function PracticePage() {
 
 interface ExerciseCardProps {
   exercise: ExerciseInstance;
-  onResult: (isCorrect: boolean) => void;
+  onResult: (isCorrect: boolean, exercise: ExerciseInstance, answer: string | string[]) => void;
   onNext: () => void;
 }
 
@@ -187,7 +178,7 @@ function ExerciseCard({ exercise, onResult, onNext }: ExerciseCardProps) {
         answer: trimmed,
       });
       setResult(res.data);
-      onResult(res.data.is_correct);
+      onResult(res.data.is_correct, exercise, trimmed);
     } catch {
       // Network error — allow retry
     } finally {
@@ -470,42 +461,86 @@ function DragOrderInput({ items, onChange, disabled, result, correctOrder }: Dra
 interface CompletionScreenProps {
   correctCount: number;
   total: number;
-  minimum: number;
-  onComplete: () => void;
-  onRetry: () => void;
+  questionResults: { exercise: ExerciseInstance; is_correct: boolean; answer: string | string[] }[];
   lessonId: string;
+  onRetry: () => void;
 }
 
-function CompletionScreen({ correctCount, total, minimum, onComplete, onRetry }: CompletionScreenProps) {
+function CompletionScreen({ correctCount, total, questionResults, lessonId, onRetry }: CompletionScreenProps) {
+  const navigate = useNavigate();
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 max-w-md w-full text-center">
-        <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-4">
-          <Trophy className="w-8 h-8 text-indigo-600" />
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        {/* Score card */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center mb-6">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4
+            ${correctCount === total ? "bg-amber-100" : "bg-indigo-100"}`}>
+            <Trophy className={`w-8 h-8 ${correctCount === total ? "text-amber-500" : "text-indigo-600"}`} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">
+            {correctCount === total ? "Perfect!" : "Sesiune finalizată"}
+          </h2>
+          <p className="text-gray-500 mb-6">
+            Ai răspuns corect la{" "}
+            <span className="font-bold text-indigo-600 text-xl">{correctCount}/{total}</span>{" "}
+            exerciții
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate(`/lesson/${lessonId}/exercises`)}
+              className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600
+                font-medium hover:bg-gray-50 transition-colors text-sm"
+            >
+              Înapoi la exerciții
+            </button>
+            <button
+              onClick={onRetry}
+              className="flex-1 py-3 rounded-xl border border-indigo-200 text-indigo-600
+                font-medium hover:bg-indigo-50 transition-colors text-sm
+                flex items-center justify-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reîncearcă
+            </button>
+          </div>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Lecție finalizată!</h2>
-        <p className="text-gray-500 mb-6">
-          Ai răspuns corect la{" "}
-          <span className="font-semibold text-indigo-600">{correctCount}</span>{" "}
-          din {total} exerciții (minim necesar: {minimum}).
-        </p>
-        <div className="flex flex-col gap-3">
-          <button
-            onClick={onComplete}
-            className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold
-              hover:bg-indigo-700 transition-colors"
-          >
-            Marchează lecția ca finalizată
-          </button>
-          <button
-            onClick={onRetry}
-            className="w-full py-3 rounded-xl border border-gray-200 text-gray-600 font-medium
-              hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Mai exersează
-          </button>
-        </div>
+
+        {/* Per-question breakdown */}
+        {questionResults.length > 0 && (
+          <>
+            <h3 className="text-sm font-semibold text-gray-600 mb-3">Recapitulare</h3>
+            <div className="space-y-3">
+              {questionResults.map((r, i) => (
+                <div
+                  key={i}
+                  className={`bg-white rounded-xl border px-5 py-4 flex items-start gap-4
+                    ${r.is_correct ? "border-green-200" : "border-red-200"}`}
+                >
+                  <div className={`mt-0.5 shrink-0 ${r.is_correct ? "text-green-500" : "text-red-500"}`}>
+                    {r.is_correct
+                      ? <CheckCircle className="w-5 h-5" />
+                      : <XCircle className="w-5 h-5" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700 font-medium">
+                      <InlineMath text={r.exercise.question} />
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Răspunsul tău:{" "}
+                      <span className="font-mono">
+                        {Array.isArray(r.answer) ? r.answer.join(", ") : r.answer || "—"}
+                      </span>
+                    </p>
+                  </div>
+                  <DifficultyBadge difficulty={r.exercise.difficulty} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
