@@ -26,3 +26,5 @@ django-extensions==3.2.3
 
 # Code Quality
 ruff==0.9.6
+
+sympy==1.13.3

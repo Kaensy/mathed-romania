@@ -113,9 +113,13 @@ class LessonAdmin(admin.ModelAdmin):
 
 @admin.register(Exercise)
 class ExerciseAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "exercise_type", "difficulty", "is_active", "lesson_display")
+    list_display = ("exercise_title", "exercise_type", "difficulty", "is_active", "lesson_display")
     list_filter = ("exercise_type", "difficulty", "is_active", "lesson__unit__grade")
-    search_fields = ("lesson__title",)
+    search_fields = ("lesson__title", "template")
+
+    @admin.display(description="Title")
+    def exercise_title(self, obj):
+        return obj.template.get("title") or f"({obj.exercise_type}) — {obj.lesson.title}"
 
     fieldsets = (
         (None, {"fields": ("lesson", "exercise_type", "difficulty")}),
@@ -149,15 +153,8 @@ class ExerciseAdmin(admin.ModelAdmin):
 
 @admin.register(Test)
 class TestAdmin(admin.ModelAdmin):
-    list_display = (
-        "__str__",
-        "pass_threshold_display",
-        "time_limit_display",
-        "exercise_count",
-        "retry_practice_count",
-        "is_published",
-    )
-    list_filter = ("is_published", "unit__grade")
+    list_display = ("__str__", "scope", "pass_threshold_display", "time_limit_display", "is_published")
+    list_filter = ("scope", "is_published")
     list_editable = ("is_published",)
 
     @admin.display(description="Pass %")

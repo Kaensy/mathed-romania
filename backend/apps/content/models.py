@@ -109,6 +109,7 @@ class Exercise(models.Model):
         TRUE_FALSE = "true_false", "True/False"
         DRAG_ORDER = "drag_order", "Drag to Order"
         CLICK_SELECT = "click_select", "Click to Select"
+        COMPARISON = "comparison", "Comparison (<, =, >)"
 
     class Difficulty(models.TextChoices):
         EASY = "easy", "Easy"
@@ -118,6 +119,12 @@ class Exercise(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="exercises")
     exercise_type = models.CharField(max_length=20, choices=ExerciseType.choices)
     difficulty = models.CharField(max_length=10, choices=Difficulty.choices, default=Difficulty.MEDIUM)
+    category = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Math exercise category e.g. 'expanded_form', 'digit_identification'",
+    )
     template = models.JSONField(
         help_text="JSONB template: params, answer formula, validation rules, display text",
     )
@@ -133,12 +140,44 @@ class Exercise(models.Model):
 
 class Test(models.Model):
     """
-    Unit evaluation test. Must be passed to unlock next unit.
-    One test per unit.
+    Evaluation test — either a lesson-level test or a unit-level test.
+    Lesson tests gate progression to the next lesson.
+    Unit tests gate progression to the next unit.
     """
-    unit = models.OneToOneField(Unit, on_delete=models.CASCADE, related_name="test")
+    class Scope(models.TextChoices):
+        LESSON = "lesson", "Lesson Test"
+        UNIT = "unit", "Unit Test"
+
+    scope = models.CharField(
+        max_length=10,
+        choices=Scope.choices,
+        default=Scope.UNIT,
+    )
+    # Exactly one of these is set depending on scope
+    unit = models.OneToOneField(
+        Unit,
+        on_delete=models.CASCADE,
+        related_name="test",
+        null=True,
+        blank=True,
+    )
+    lesson = models.OneToOneField(
+        "Lesson",
+        on_delete=models.CASCADE,
+        related_name="test",
+        null=True,
+        blank=True,
+    )
+    composition = models.JSONField(
+        default=list,
+        help_text=(
+            "List of {category, count, weight, difficulty} dicts. "
+            "Example: [{\"category\": \"expanded_form\", \"count\": 2, "
+            "\"weight\": 30, \"difficulty\": \"easy\"}]"
+        ),
+    )
     pass_threshold = models.PositiveSmallIntegerField(
-        default=70,
+        default=60,
         help_text="Minimum score (%) to pass",
     )
     time_limit_minutes = models.PositiveSmallIntegerField(
@@ -146,21 +185,30 @@ class Test(models.Model):
         blank=True,
         help_text="Time limit in minutes. Null = untimed.",
     )
-    exercise_count = models.PositiveSmallIntegerField(
-        default=10,
-        help_text="Number of exercises in this test",
-    )
     retry_practice_count = models.PositiveSmallIntegerField(
         default=5,
-        help_text="Extra practice exercises required after a failed attempt",
+        help_text="Extra practice exercises required after a failed attempt before retry",
     )
     is_published = models.BooleanField(default=False)
 
     class Meta:
         db_table = "tests"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(scope="lesson", lesson__isnull=False, unit__isnull=True) |
+                    models.Q(scope="unit", unit__isnull=False, lesson__isnull=True)
+                ),
+                name="test_scope_consistency",
+            )
+        ]
 
     def __str__(self):
-        return f"Test: {self.unit.title}"
+        if self.scope == self.Scope.LESSON and self.lesson:
+            return f"Test (Lecție): {self.lesson.title}"
+        if self.scope == self.Scope.UNIT and self.unit:
+            return f"Test (Unitate): {self.unit.title}"
+        return f"Test ({self.scope})"
 
 
 class GlossaryTerm(models.Model):

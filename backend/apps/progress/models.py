@@ -70,7 +70,14 @@ class ExerciseAttempt(models.Model):
 
 
 class TestAttempt(models.Model):
-    """Test attempt history with scores."""
+    """
+    Test attempt — covers both in-progress and completed attempts.
+    Used for both lesson tests and unit tests.
+    """
+    class Status(models.TextChoices):
+        IN_PROGRESS = "in_progress", "In Progress"
+        COMPLETED = "completed", "Completed"
+        ABANDONED = "abandoned", "Abandoned"
 
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -83,9 +90,31 @@ class TestAttempt(models.Model):
         on_delete=models.CASCADE,
         related_name="attempts",
     )
-    score = models.DecimalField(max_digits=5, decimal_places=2)
-    passed = models.BooleanField()
-    started_at = models.DateTimeField()
+    status = models.CharField(
+        max_length=15,
+        choices=Status.choices,
+        default=Status.IN_PROGRESS,
+    )
+    # Stores generated exercise instances for this session so
+    # the same exercises are shown throughout (not re-randomized on refresh)
+    exercise_instances = models.JSONField(
+        default=list,
+        help_text="Generated exercise instances for this attempt",
+    )
+    # Stores submitted answers keyed by position index
+    answers = models.JSONField(
+        default=dict,
+        help_text="Submitted answers: {index: {answer, is_correct, exercise_id}}",
+    )
+    score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Final score percentage, set on completion",
+    )
+    passed = models.BooleanField(null=True, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -93,8 +122,8 @@ class TestAttempt(models.Model):
         ordering = ["-started_at"]
 
     def __str__(self):
-        result = "PASS" if self.passed else "FAIL"
-        return f"{self.student.email} — {self.test} — {result} ({self.score}%)"
+        result = f"{self.score}%" if self.score is not None else "in progress"
+        return f"{self.student.email} — {self.test} — {result}"
 
 
 class ClassroomPace(models.Model):

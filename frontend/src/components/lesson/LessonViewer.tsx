@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, PenLine } from "lucide-react";
 import { BlockRenderer } from "./Blocks";
 import type { LessonDetail } from "@/types/lesson";
 import api from "@/api/client";
@@ -35,6 +35,20 @@ export default function LessonViewer() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [lessonId]);
 
+    // Mark lesson as opened when it loads
+    useEffect(() => {
+        if (!lessonId || !lesson) return;
+        api.post(`/progress/lessons/${lessonId}/open/`).catch(() => { });
+    }, [lessonId, lesson]);
+
+  // Call open endpoint when lesson loads successfully
+  useEffect(() => {
+     if (!lessonId || !lesson) return;
+        api
+            .post(`/progress/lessons/${lessonId}/open/`)
+            .catch(() => { }); // fire-and-forget, never block the UI
+  }, [lessonId, lesson]);
+
   if (loading) return <LessonSkeleton />;
   if (error) return <LessonError message={error} />;
   if (!lesson) return null;
@@ -45,7 +59,7 @@ export default function LessonViewer() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-4">
           <Link
-            to={`/grade/${lesson.grade_number}/unit/${lesson.unit_id}`}
+            to={`/grade/${lesson.grade_number}`}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -110,31 +124,48 @@ export default function LessonViewer() {
         </div>
 
         {/* Bottom navigation */}
-        <div className="mt-12 pt-6 border-t border-gray-200 flex items-center justify-between">
-          {lesson.prev_lesson_id ? (
-            <Link
-              to={`/lesson/${lesson.prev_lesson_id}`}
-              className="flex items-center gap-2 text-gray-500 hover:text-indigo-600 transition-colors group"
-            >
-              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
-              <span className="text-sm font-medium">Lecția anterioară</span>
-            </Link>
-          ) : (
-            <div />
-          )}
+              {/* Bottom navigation */}
+              <div className="mt-12 pt-6 border-t border-gray-200 space-y-4">
 
-          {lesson.next_lesson_id ? (
-            <Link
-              to={`/lesson/${lesson.next_lesson_id}`}
-              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors group"
-            >
-              <span className="text-sm font-medium">Lecția următoare</span>
-              <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
-          ) : (
-            <div />
-          )}
-        </div>
+                  {/* Practice button — shown if lesson has exercises */}
+                  {lesson.exercises.length > 0 && (
+                      <Link
+                          to={`/lesson/${lessonId}/practice`}
+                          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
+        bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                          <PenLine className="w-4 h-4" />
+                          Exersează — {lesson.exercises.length} exerciții
+                      </Link>
+                  )}
+
+                  {/* Prev / Next */}
+                  <div className="flex items-center justify-between">
+                      {lesson.prev_lesson_id ? (
+                          <Link
+                              to={`/lesson/${lesson.prev_lesson_id}`}
+                              className="flex items-center gap-2 text-gray-500 hover:text-indigo-600 transition-colors group"
+                          >
+                              <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+                              <span className="text-sm font-medium">Lecția anterioară</span>
+                          </Link>
+                      ) : (
+                          <div />
+                      )}
+
+                      {lesson.next_lesson_id ? (
+                          <Link
+                              to={`/lesson/${lesson.next_lesson_id}`}
+                              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors group"
+                          >
+                              <span className="text-sm font-medium">Lecția următoare</span>
+                              <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                          </Link>
+                      ) : (
+                          <div />
+                      )}
+                  </div>
+              </div>
       </main>
     </div>
   );
