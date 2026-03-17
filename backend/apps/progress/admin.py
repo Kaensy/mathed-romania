@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ClassroomPace, ExerciseAttempt, LessonProgress, Streak, TestAttempt
+from .models import CategoryProgress, ClassroomPace, ExerciseAttempt, LessonProgress, Streak, TestAttempt
 
 
 @admin.register(LessonProgress)
@@ -11,8 +11,15 @@ class LessonProgressAdmin(admin.ModelAdmin):
 
 @admin.register(ExerciseAttempt)
 class ExerciseAttemptAdmin(admin.ModelAdmin):
-    list_display = ("student", "exercise", "is_correct", "attempted_at")
+    list_display = ("student", "exercise", "is_correct", "session_id", "attempted_at")
     list_filter = ("is_correct",)
+
+
+@admin.register(CategoryProgress)
+class CategoryProgressAdmin(admin.ModelAdmin):
+    list_display = ("student", "lesson", "category", "easy_cleared", "medium_cleared", "hard_cleared")
+    list_filter = ("easy_cleared", "medium_cleared", "hard_cleared")
+    search_fields = ("student__email", "lesson__title", "category")
 
 
 @admin.register(TestAttempt)

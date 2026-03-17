@@ -105,6 +105,7 @@ class Exercise(models.Model):
     class ExerciseType(models.TextChoices):
         MULTIPLE_CHOICE = "multiple_choice", "Multiple Choice"
         FILL_BLANK = "fill_blank", "Fill in the Blank"
+        MULTI_FILL_BLANK = "multi_fill_blank", "Multi Fill in the Blank"
         EXPRESSION = "expression", "Expression Input"
         TRUE_FALSE = "true_false", "True/False"
         DRAG_ORDER = "drag_order", "Drag to Order"

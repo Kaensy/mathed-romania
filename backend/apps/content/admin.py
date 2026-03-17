@@ -122,7 +122,7 @@ class ExerciseAdmin(admin.ModelAdmin):
         return obj.template.get("title") or f"({obj.exercise_type}) — {obj.lesson.title}"
 
     fieldsets = (
-        (None, {"fields": ("lesson", "exercise_type", "difficulty")}),
+        (None, {"fields": ("lesson", "exercise_type", "difficulty", "category")}),
         (
             "Exercise Template (JSON)",
             {

@@ -10,7 +10,7 @@
  *   - Final screen reveals score, pass/fail, and per-question breakdown
  */
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -25,7 +25,6 @@ import api from "@/api/client";
 import { InlineMath, BlockMath } from "@/lib/math";
 import type { ExerciseInstance } from "@/types/progress";
 import type {
-  AnswerRecord,
   TestFinishResponse,
   TestStartResponse,
 } from "@/types/test";
@@ -38,7 +37,7 @@ export default function TestPage() {
 
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [exercises, setExercises] = useState<ExerciseInstance[]>([]);
-  const [answers, setAnswers] = useState<Record<number, string | string[]>>({});
+  const [answers, setAnswers] = useState<Record<number, string | string[] | Record<string, string>>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -64,8 +63,8 @@ export default function TestPage() {
       .finally(() => setLoading(false));
   }, [testId]);
 
-  const handleAnswer = (index: number, answer: string | string[]) => {
-    setAnswers((prev) => ({ ...prev, [index]: answer }));
+  const handleAnswer = (index: number, ans: string | string[] | Record<string, string>) => {
+    setAnswers((prev) => ({ ...prev, [index]: ans }));
   };
 
   const handleFinish = async () => {
@@ -109,7 +108,6 @@ export default function TestPage() {
       <TestResultScreen
         result={result}
         exercises={exercises}
-        answers={answers}
         onRetry={() => {
           setResult(null);
           setAnswers({});
@@ -197,7 +195,7 @@ export default function TestPage() {
 
         {/* Exercise */}
         <TestExerciseCard
-          exercise={exercise}
+          exercise={exercise!}
           answer={currentAnswer}
           onAnswer={(ans) => handleAnswer(currentIndex, ans)}
           index={currentIndex}
@@ -272,8 +270,9 @@ export default function TestPage() {
 
 interface TestExerciseCardProps {
   exercise: ExerciseInstance;
-  answer: string | string[] | undefined;
-  onAnswer: (answer: string | string[]) => void;
+  answer: string | string[] | Record<string, string> | undefined;
+    onAnswer: (answer: string | string[] | Record<string, string>) => void;
+
   index: number;
   total: number;
 }
@@ -304,7 +303,35 @@ function TestExerciseCard({ exercise, answer, onAnswer, index, total }: TestExer
       </div>
 
       {/* Input */}
+
       <div className="px-6 py-5">
+
+        {exercise.exercise_type === "multi_fill_blank" && exercise.fields && (
+          <div className="space-y-3">
+            {exercise.fields.map((field) => (
+              <div key={field.key} className="flex items-center gap-3">
+                <span className="text-gray-700 font-medium w-6 text-right shrink-0">
+                  {field.label} =
+                </span>
+                <input
+                  type="text"
+                  value={((answer as Record<string, string>) ?? {})[field.key] ?? ""}
+                  onChange={(e) =>
+                    onAnswer({
+                      ...((answer as Record<string, string>) ?? {}),
+                      [field.key]: e.target.value,
+                    })
+                  }
+                  placeholder="cifră..."
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50
+                    text-gray-800 text-base outline-none focus:border-indigo-400 focus:bg-white
+                    transition-colors"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         {exercise.exercise_type === "fill_blank" && (
           <input
             type="text"
@@ -410,7 +437,7 @@ function TestDragOrderInput({
     if (dragItem.current === null || dragOver.current === null) return;
     const newItems = [...items];
     const dragged = newItems.splice(dragItem.current, 1)[0];
-    newItems.splice(dragOver.current, 0, dragged);
+    if (dragged !== undefined) newItems.splice(dragOver.current, 0, dragged);
     onChange(newItems);
     dragItem.current = null;
     dragOver.current = null;
@@ -444,11 +471,10 @@ function TestDragOrderInput({
 interface TestResultScreenProps {
   result: TestFinishResponse;
   exercises: ExerciseInstance[];
-  answers: Record<number, string | string[]>;
   onRetry: () => void;
 }
 
-function TestResultScreen({ result, exercises, answers, onRetry }: TestResultScreenProps) {
+function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps) {
   const navigate = useNavigate();
   const scoreInt = Math.round(Number(result.score));
   const romanianGrade = Math.round((scoreInt / 100) * 9 + 1);

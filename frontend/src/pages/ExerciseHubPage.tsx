@@ -1,31 +1,34 @@
-// frontend/src/pages/ExerciseHubPage.tsx
 /**
- * ExerciseHubPage — shows all exercise categories for a lesson.
+ * ExerciseHubPage — shows all exercise categories for a lesson,
+ * each with three difficulty tiers (Easy / Medium / Hard).
  *
  * Route: /lesson/:lessonId/exercises
  *
- * Student sees each category (or "Toate exercițiile" if uncategorized),
- * their best score, and can start a 5-exercise session for any category.
+ * Tier unlock rules (mirrored from backend CategoryProgress):
+ *   Easy   — always available
+ *   Medium — unlocked after Easy is cleared
+ *   Hard   — unlocked after Easy is cleared
+ *   Completing Medium OR Hard marks the category as "completed"
+ *   Completing Hard also earns a bonus reward (shown as ⭐)
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Star } from "lucide-react";
+import { ArrowLeft, Lock, Star, CheckCircle, ChevronRight } from "lucide-react";
 import api from "@/api/client";
+import type { CategoryInfo, Difficulty, LessonCategoriesResponse, TierState } from "@/types/progress";
+import { CATEGORY_LABELS } from "@/constants/categoryLabels";
 
-interface CategoryInfo {
-  category: string;
-  label: string;
-  exercise_count: number;
-  correct_attempts: number;
-  total_attempts: number;
-  best_session_score: number | null; // best X out of 5
-}
+// ─── Tier config ──────────────────────────────────────────────────────────────
 
-interface LessonCategoriesResponse {
-  lesson_id: number;
-  lesson_title: string;
-  categories: CategoryInfo[];
-}
+const TIER_CONFIG: Record<Difficulty, { label: string; color: string; ring: string; bg: string }> = {
+  easy:   { label: "Ușor",  color: "text-emerald-700", ring: "ring-emerald-400", bg: "bg-emerald-50" },
+  medium: { label: "Mediu", color: "text-amber-700",   ring: "ring-amber-400",   bg: "bg-amber-50"   },
+  hard:   { label: "Greu",  color: "text-rose-700",    ring: "ring-rose-400",    bg: "bg-rose-50"    },
+};
+
+const TIERS: Difficulty[] = ["easy", "medium", "hard"];
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ExerciseHubPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
@@ -44,6 +47,7 @@ export default function ExerciseHubPage() {
   }, [lessonId]);
 
   if (loading) return <HubSkeleton />;
+
   if (error || !data) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -56,6 +60,10 @@ export default function ExerciseHubPage() {
       </div>
     );
   }
+
+  const completedCategories = data.categories.filter(
+    (c) => c.tiers.medium.cleared || c.tiers.hard.cleared,
+  ).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,82 +82,171 @@ export default function ExerciseHubPage() {
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Exerciții</h1>
-        <p className="text-gray-500 text-sm mb-8">{data.lesson_title}</p>
+        <p className="text-gray-500 text-sm mb-2">{data.lesson_title}</p>
 
-        <div className="space-y-3">
-          {data.categories.map((cat) => {
-            const hasAttempts = cat.total_attempts > 0;
-            const accuracyPct = hasAttempts
-              ? Math.round((cat.correct_attempts / cat.total_attempts) * 100)
-              : null;
-
-            return (
-              <Link
-                key={cat.category}
-                to={`/lesson/${lessonId}/practice${cat.category ? `?category=${cat.category}` : ""}`}
-                className="block bg-white rounded-xl border border-gray-200 shadow-sm
-                  hover:border-indigo-300 hover:shadow-md transition-all group"
-              >
-                <div className="px-5 py-4 flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 group-hover:text-indigo-700 transition-colors">
-                      {cat.label}
-                    </p>
-                    <p className="text-sm text-gray-400 mt-0.5">
-                      {cat.exercise_count} {cat.exercise_count === 1 ? "tip de exercițiu" : "tipuri de exerciții"}
-                    </p>
-                  </div>
-
-                  {/* Score display */}
-                  <div className="shrink-0 text-right">
-                    {cat.best_session_score !== null ? (
-                      <div className="flex items-center gap-1.5">
-                        <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                        <span className="font-bold text-gray-800">
-                          {cat.best_session_score}/5
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">Neînceput</span>
-                    )}
-                    {accuracyPct !== null && (
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {cat.correct_attempts}/{cat.total_attempts} corecte
-                      </p>
-                    )}
-                  </div>
-
-                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 transition-colors shrink-0" />
-                </div>
-
-                {/* Progress bar */}
-                {cat.best_session_score !== null && (
-                  <div className="px-5 pb-4">
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-1.5 bg-indigo-500 rounded-full transition-all duration-500"
-                        style={{ width: `${(cat.best_session_score / 5) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </Link>
-            );
-          })}
+        {/* Summary bar */}
+        <div className="flex items-center gap-4 mb-8 text-sm text-gray-500">
+          <span>
+            <span className="font-semibold text-gray-800">{completedCategories}</span>
+            {" "}/ {data.categories.length} categorii completate
+          </span>
+          {data.categories.some((c) => c.tiers.hard.cleared) && (
+            <span className="flex items-center gap-1 text-amber-600 font-medium">
+              <Star className="w-3.5 h-3.5 fill-amber-400" />
+              Bonus obținut
+            </span>
+          )}
         </div>
+
+        {data.categories.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <p>Nu există exerciții disponibile pentru această lecție.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {data.categories.map((cat) => (
+              <CategoryCard key={cat.category} cat={cat} lessonId={lessonId!} />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
 }
 
+// ─── Category card ────────────────────────────────────────────────────────────
+
+function CategoryCard({ cat, lessonId }: { cat: CategoryInfo; lessonId: string }) {
+  const displayLabel = CATEGORY_LABELS[cat.category] ?? cat.label;
+  const isCompleted = cat.tiers.medium.cleared || cat.tiers.hard.cleared;
+  const hasBonusCleared = cat.tiers.hard.cleared;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Category header */}
+      <div className="px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              {displayLabel}
+              {isCompleted && (
+                <CheckCircle className="w-4 h-4 text-emerald-500" />
+              )}
+              {hasBonusCleared && (
+                <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
+              )}
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {cat.exercise_count} exerciții
+              {cat.exercises_attempted > 0 && (
+                <> · {cat.exercises_attempted} încercări · {cat.perfect_batches} sesiuni perfecte</>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tier buttons */}
+      <div className="grid grid-cols-3 divide-x divide-gray-100">
+        {TIERS.map((tier) => (
+          <TierButton
+            key={tier}
+            tier={tier}
+            state={cat.tiers[tier]}
+            lessonId={lessonId}
+            category={cat.category}
+            isHardBonus={tier === "hard"}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tier button ──────────────────────────────────────────────────────────────
+
+interface TierButtonProps {
+  tier: Difficulty;
+  state: TierState;
+  lessonId: string;
+  category: string;
+  isHardBonus: boolean;
+}
+
+function TierButton({ tier, state, lessonId, category, isHardBonus }: TierButtonProps) {
+  const navigate = useNavigate();
+  const config = TIER_CONFIG[tier];
+  const isLocked = !state.available;
+  const isCleared = state.cleared;
+
+  const handleClick = () => {
+    if (isLocked) return;
+    const params = new URLSearchParams({ category });
+    params.set("difficulty", tier);
+    navigate(`/lesson/${lessonId}/practice?${params}`);
+  };
+
+  if (isLocked) {
+    return (
+      <div className="flex flex-col items-center justify-center py-5 px-3 text-center opacity-40 cursor-not-allowed select-none">
+        <Lock className="w-4 h-4 text-gray-400 mb-1.5" />
+        <span className="text-xs font-medium text-gray-500">{config.label}</span>
+        {isHardBonus && (
+          <span className="text-xs text-amber-500 mt-0.5 flex items-center gap-0.5">
+            <Star className="w-3 h-3 fill-amber-400" /> Bonus
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`group flex flex-col items-center justify-center py-5 px-3 text-center transition-all hover:${config.bg} focus:outline-none focus-visible:ring-2 ${config.ring}`}
+    >
+      {isCleared ? (
+        <CheckCircle className={`w-5 h-5 mb-1.5 ${config.color}`} />
+      ) : (
+        <ChevronRight className={`w-5 h-5 mb-1.5 ${config.color} opacity-60 group-hover:opacity-100 transition-opacity`} />
+      )}
+      <span className={`text-xs font-semibold ${config.color}`}>{config.label}</span>
+      {isHardBonus && (
+        <span className={`text-xs mt-0.5 flex items-center gap-0.5 ${isCleared ? "text-amber-500" : "text-gray-400"}`}>
+          <Star className={`w-3 h-3 ${isCleared ? "fill-amber-400" : ""}`} /> Bonus
+        </span>
+      )}
+      {isCleared && (
+        <span className={`text-xs mt-1 ${config.color} opacity-60`}>Completat</span>
+      )}
+    </button>
+  );
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
 function HubSkeleton() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="h-14 bg-white border-b border-gray-200" />
-      <div className="max-w-2xl mx-auto px-4 py-8 animate-pulse space-y-3">
-        <div className="h-7 bg-gray-200 rounded w-40 mb-6" />
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 h-20" />
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 h-14" />
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+        <div className="h-8 w-48 bg-gray-200 rounded-lg animate-pulse" />
+        <div className="h-4 w-32 bg-gray-100 rounded animate-pulse" />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />
+              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mt-2" />
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-gray-100">
+              {[1, 2, 3].map((j) => (
+                <div key={j} className="py-5 flex flex-col items-center gap-2">
+                  <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse" />
+                  <div className="h-3 w-10 bg-gray-100 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>

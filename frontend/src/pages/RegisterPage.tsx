@@ -88,7 +88,7 @@ export default function RegisterPage() {
   const getFieldError = (field: string): string => {
     const err = errors[field];
     if (!err) return "";
-    return Array.isArray(err) ? err[0] : err;
+    return Array.isArray(err) ? (err[0] ?? "") : (err ?? "");
   };
 
   // If consent was needed, show success message

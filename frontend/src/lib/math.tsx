@@ -32,7 +32,7 @@ export function InlineMath({ text, className }: { text: string; className?: stri
 
   return (
     <span className={className}>
-      {parts.map((part, i) => {
+      {parts.map((part, _i) => {
         if (typeof part === "string") {
           return part;
         }

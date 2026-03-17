@@ -93,8 +93,13 @@ _TOKEN_SALT = "mathed-exercise-instance-v1"
 
 def _generate_params(params_spec: dict) -> dict:
     result: dict[str, Any] = {}
+
+    # Two-pass: non-computed first, computed second.
+    # This makes declaration order irrelevant.
     for name, spec in params_spec.items():
         t = spec["type"]
+        if t == "computed":
+            continue
         if t == "randint":
             result[name] = random.randint(spec["min"], spec["max"])
         elif t == "randint_nonzero":
@@ -106,16 +111,18 @@ def _generate_params(params_spec: dict) -> dict:
             result[name] = random.choice(spec["options"])
         elif t == "fixed":
             result[name] = spec["value"]
-        elif t == "computed":
-            # Evaluate a Python expression using already-resolved params.
-            # Example: {"type": "computed", "expr": "({n} // 100) % 10"}
-            expr = spec["expr"]
-            filled = expr
-            for key, value in result.items():
-                filled = filled.replace(f"{{{key}}}", str(value))
-            result[name] = eval(filled)   # safe: only math ops on integers
         else:
             raise ValueError(f"Unknown param type: {t}")
+
+    for name, spec in params_spec.items():
+        if spec["type"] != "computed":
+            continue
+        expr = spec["expr"]
+        filled = expr
+        for key, value in result.items():
+            filled = filled.replace(f"{{{key}}}", str(value))
+        result[name] = eval(filled)  # safe: only math ops on integers
+
     return result
 
 
@@ -143,6 +150,44 @@ def _build_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
     }
     grading = {
         "correct_expr": _fill(template["answer_expr"], params),
+    }
+    return frontend, grading
+
+def _build_multi_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
+    """
+    Multi-field fill-in-the-blank. Student fills in one input per field.
+    All fields must be correct for the attempt to count as correct.
+
+    Template format:
+    {
+      "question": "Determinați cifrele $a, b, c, d$ știind că ...",
+      "params": { ... },
+      "fields": [
+        {"key": "a", "label": "a", "answer_expr": "{p}"},
+        {"key": "b", "label": "b", "answer_expr": "{q}"},
+        {"key": "c", "label": "c", "answer_expr": "{r}"},
+        {"key": "d", "label": "d", "answer_expr": "{s}"}
+      ],
+      "hint": "..."
+    }
+    """
+    fields_out = []
+    correct_map = {}
+
+    for field in template["fields"]:
+        key = field["key"]
+        label = field["label"]
+        correct_expr = _fill(field["answer_expr"], params)
+        fields_out.append({"key": key, "label": label})
+        correct_map[key] = correct_expr
+
+    frontend = {
+        "question": _fill(template["question"], params),
+        "fields": fields_out,
+        "hint": template.get("hint"),
+    }
+    grading = {
+        "correct_map": correct_map,
     }
     return frontend, grading
 
@@ -282,7 +327,9 @@ def generate_instance(exercise) -> dict:
 
     builders = {
         "fill_blank": _build_fill_blank,
+        "multi_fill_blank": _build_multi_fill_blank,
         "multiple_choice": _build_multiple_choice,
+
         "comparison": _build_comparison,
         "drag_order": _build_drag_order,
     }
@@ -298,6 +345,7 @@ def generate_instance(exercise) -> dict:
             "exercise_id": exercise.id,
             "exercise_type": exercise_type,
             "grading_data": grading_data,
+            "nonce": random.randint(0, 999999),
         },
         salt=_TOKEN_SALT,
     )

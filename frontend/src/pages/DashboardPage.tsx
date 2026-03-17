@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// FILE 1: frontend/src/pages/DashboardPage.tsx  (replace existing)
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
@@ -81,8 +77,9 @@ export default function DashboardPage() {
               loading={loadingStats}
               icon={<PenLine className="w-5 h-5 text-emerald-500" />}
               label="Exerciții rezolvate"
-              value={stats ? String(stats.total_attempts) : "—"}
-              sub={stats?.total_attempts ? `${stats.accuracy_percent}% corecte` : undefined}
+              value={stats ? String(stats.exercises_attempted) : "—"}
+              sub={stats?.perfect_batches ? `${stats.perfect_batches} sesiuni perfecte` : undefined}
+
             />
             <StatCard
               loading={loadingStats}

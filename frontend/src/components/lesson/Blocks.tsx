@@ -7,7 +7,6 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Globe, BookOpen, Cpu } from "lucide-react";
 import { BlockMath, InlineMath } from "@/lib/math";
 import type {
-  MergedTable,
   ParagraphBlock,
   DefinitionBox,
   ObservationBox,
@@ -213,7 +212,9 @@ export function WorkedExampleMultiComponent({ block }: { block: WorkedExampleMul
   const [activeMethod, setActiveMethod] = useState(0);
   const [visibleSteps, setVisibleSteps] = useState(0);
   const method = block.methods[activeMethod];
-  const allVisible = visibleSteps >= method.steps.length;
+    if (!method) return null;
+    const allVisible = visibleSteps >= method.steps.length;
+
 
   const handleMethodChange = (index: number) => {
     setActiveMethod(index);

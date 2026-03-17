@@ -22,7 +22,8 @@ class AttemptSubmitSerializer(serializers.Serializer):
     """Validates incoming attempt submission from the frontend."""
     exercise_id = serializers.IntegerField()
     instance_token = serializers.CharField()
-    answer = serializers.JSONField()  # string for fill_blank/comparison/mc, list for drag_order
+    answer = serializers.JSONField()       # string for fill_blank/comparison/mc, list for drag_order, dict for multi_fill_blank
+    session_id = serializers.UUIDField(required=False, allow_null=True, default=None)
 
 
 class DashboardSerializer(serializers.Serializer):
@@ -30,7 +31,6 @@ class DashboardSerializer(serializers.Serializer):
     total_lessons = serializers.IntegerField()
     completed_lessons = serializers.IntegerField()
     in_progress_lessons = serializers.IntegerField()
-    total_attempts = serializers.IntegerField()
-    correct_attempts = serializers.IntegerField()
-    accuracy_percent = serializers.FloatField()
+    exercises_attempted = serializers.IntegerField()
+    perfect_batches = serializers.IntegerField()
     units = serializers.ListField(child=serializers.DictField())

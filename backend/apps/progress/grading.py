@@ -30,7 +30,6 @@ TRANSFORMATIONS = standard_transformations + (
 )
 
 # Maximum time (seconds) allowed for a single SymPy simplification.
-# Prevents DoS on pathological inputs like 9^9^9^9.
 GRADE_TIMEOUT_SECONDS = 5
 
 
@@ -42,7 +41,14 @@ class GradingTimeout(Exception):
 
 @contextmanager
 def time_limit(seconds: int):
-    """Context manager that raises GradingTimeout after `seconds`."""
+    """Context manager that raises GradingTimeout after `seconds`.
+    No-op on Windows where SIGALRM is unavailable.
+    """
+    if not hasattr(signal, "SIGALRM"):
+        # Windows — no SIGALRM support, skip timeout
+        yield
+        return
+
     def _handler(signum, frame):
         raise GradingTimeout("Grading timed out")
 
@@ -60,16 +66,8 @@ def time_limit(seconds: int):
 def normalize(raw: str) -> str:
     """
     Normalize student input to a form SymPy can parse.
-
-    Handles:
-      - Romanian division notation:  : → /
-      - Implicit multiplication:     2(3) → 2*(3)   [handled by SymPy transform]
-      - Leading/trailing whitespace
     """
     s = raw.strip()
-    # Replace Romanian division sign with Python division.
-    # Careful: don't replace inside tokens like "10:00" — here we use word
-    # boundaries, but since these are math expressions it's safe to be greedy.
     s = s.replace(":", "/")
     return s
 
@@ -82,13 +80,6 @@ def grade_expression(
 ) -> tuple[bool, Optional[str]]:
     """
     Compare student answer to a correct expression symbolically.
-
-    Both sides are parsed by SymPy; if their difference simplifies to 0
-    they are considered equal.
-
-    Returns:
-        (is_correct, error_message)
-        error_message is None when parsing succeeded (answer may still be wrong).
     """
     if not student_raw or not student_raw.strip():
         return False, "empty_input"
@@ -119,12 +110,6 @@ def grade_comparison(
 ) -> tuple[bool, Optional[str]]:
     """
     Grade a comparison exercise where the student selects <, =, or >.
-
-    Evaluates both sides numerically/symbolically and determines the
-    correct relation, then checks against the student's choice.
-
-    Returns:
-        (is_correct, error_message)
     """
     try:
         left_sym = parse_expr(normalize(left_expr), transformations=TRANSFORMATIONS)
@@ -152,12 +137,7 @@ def grade_multiple_choice(
     student_answer: str,
     correct_option_id: str,
 ) -> tuple[bool, None]:
-    """
-    Grade multiple choice — exact match on option ID.
-
-    Returns:
-        (is_correct, None)
-    """
+    """Grade multiple choice — exact match on option ID."""
     return student_answer.strip() == correct_option_id.strip(), None
 
 
@@ -165,13 +145,33 @@ def grade_drag_order(
     student_order: list,
     correct_order: list,
 ) -> tuple[bool, None]:
-    """
-    Grade drag-to-order — compare ordered lists element-by-element.
-
-    Returns:
-        (is_correct, None)
-    """
+    """Grade drag-to-order — compare ordered lists element-by-element."""
     return list(student_order) == list(correct_order), None
+
+
+def grade_multi_fill_blank(
+    student_answers: dict,
+    correct_map: dict,
+) -> tuple[bool, Optional[str]]:
+    """
+    Grade multi-field fill-in-the-blank.
+
+    student_answers: {"a": "3", "b": "7", "c": "0", "d": "9"}
+    correct_map:     {"a": "3", "b": "7", "c": "0", "d": "9"}
+
+    All fields must be correct (symbolic match via grade_expression).
+    Returns is_correct=False on the first wrong field found.
+    """
+    if not isinstance(student_answers, dict):
+        return False, "invalid_format"
+
+    for key, correct_expr in correct_map.items():
+        student_val = str(student_answers.get(key, "")).strip()
+        is_correct, error = grade_expression(student_val, correct_expr)
+        if not is_correct:
+            return False, error
+
+    return True, None
 
 
 # ─── Dispatcher ───────────────────────────────────────────────────────────────
@@ -185,20 +185,19 @@ def grade_attempt(
     Unified grading dispatcher.
 
     Args:
-        exercise_type:   One of fill_blank | comparison | multiple_choice | drag_order
-        student_answer:  Raw student input (string or list for drag_order)
-        grading_data:    Dict produced by exercise_engine containing everything
-                         needed to evaluate the answer:
-                           fill_blank      → {"correct_expr": "..."}
-                           comparison      → {"left_expr": "...", "right_expr": "..."}
-                           multiple_choice → {"correct_option_id": "..."}
-                           drag_order      → {"correct_order": [...]}
-
-    Returns:
-        (is_correct, error_message)
+        exercise_type:   fill_blank | multi_fill_blank | comparison |
+                         multiple_choice | drag_order
+        student_answer:  string, list (drag_order), or dict (multi_fill_blank)
+        grading_data:    dict from exercise_engine with grading keys
     """
     if exercise_type == "fill_blank":
         return grade_expression(str(student_answer), grading_data["correct_expr"])
+
+    elif exercise_type == "multi_fill_blank":
+        return grade_multi_fill_blank(
+            student_answer,
+            grading_data["correct_map"],
+        )
 
     elif exercise_type == "comparison":
         return grade_comparison(
