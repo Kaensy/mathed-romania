@@ -101,16 +101,16 @@ export default function DashboardPage() {
             <h3 className="font-semibold text-gray-900">Lecții</h3>
             <p className="mt-1 text-sm text-gray-500">Clasa a V-a — Matematică</p>
           </Link>
-          <div className="rounded-xl border bg-white p-6 opacity-60">
-            <div className="mb-3 text-2xl">✏️</div>
-            <h3 className="font-semibold text-gray-900">Exerciții</h3>
-            <p className="mt-1 text-sm text-gray-500">Accesează din interiorul lecțiilor</p>
-          </div>
-          <div className="rounded-xl border bg-white p-6 opacity-60">
-            <div className="mb-3 text-2xl">🏆</div>
-            <h3 className="font-semibold text-gray-900">Teste</h3>
-            <p className="mt-1 text-sm text-gray-500">Disponibil în curând</p>
-          </div>
+          <Link to="/exercises" className="rounded-xl border bg-white p-6 hover:border-indigo-300 hover:shadow-sm transition-all block">
+  <div className="mb-3 text-2xl">✏️</div>
+  <h3 className="font-semibold text-gray-900">Exerciții</h3>
+  <p className="mt-1 text-sm text-gray-500">Toate exercițiile tale</p>
+</Link>
+          <Link to="/tests" className="rounded-xl border bg-white p-6 hover:border-indigo-300 hover:shadow-sm transition-all block">
+  <div className="mb-3 text-2xl">🏆</div>
+  <h3 className="font-semibold text-gray-900">Teste</h3>
+  <p className="mt-1 text-sm text-gray-500">Evaluările lecțiilor</p>
+</Link>
         </div>
 
         {/* Per-unit progress — only show if we have data and user is student */}

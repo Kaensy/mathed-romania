@@ -258,17 +258,20 @@ class ExerciseAttemptView(APIView):
         grading_data = token_data["grading_data"]
         is_correct, error_msg = grade_attempt(exercise_type, student_answer, grading_data)
 
-        ExerciseAttempt.objects.create(
-            student=request.user,
-            exercise=exercise,
-            answer={"raw": student_answer},
-            is_correct=is_correct,
-            session_id=session_id,
-        )
+        is_preview = request.query_params.get("preview") == "true"
+
+        if not is_preview:
+            ExerciseAttempt.objects.create(
+                student=request.user,
+                exercise=exercise,
+                answer={"raw": student_answer},
+                is_correct=is_correct,
+                session_id=session_id,
+            )
 
         # ── Perfect batch detection ────────────────────────────────────────
         tier_cleared = None
-        if session_id:
+        if not is_preview and session_id:
             tier_cleared = self._check_and_update_tier(request.user, exercise, session_id)
 
         correct_answer_display = _build_correct_display(exercise_type, grading_data)
@@ -694,6 +697,13 @@ def _build_correct_display(exercise_type: str, grading_data: dict) -> str:
         parts = [f"{k} = {v}" for k, v in grading_data.get("correct_map", {}).items()]
         return ", ".join(parts)
     elif exercise_type == "fill_blank":
+        # Set-membership grading
+        if "valid_set" in grading_data:
+            if grading_data.get("answer_display"):
+                return grading_data["answer_display"]
+            valid = grading_data["valid_set"]
+            return f"orice număr din intervalul [{min(valid)}, {max(valid)}]"
+        # Standard symbolic grading
         expr = grading_data.get("correct_expr", "")
         try:
             from apps.progress.grading import TRANSFORMATIONS, normalize
@@ -729,3 +739,173 @@ def _build_correct_display(exercise_type: str, grading_data: dict) -> str:
     elif exercise_type == "drag_order":
         return ", ".join(str(x) for x in grading_data.get("correct_order", []))
     return ""
+
+
+# ─── Exercises overview ───────────────────────────────────────────────────────
+
+class ExercisesOverviewView(APIView):
+    """
+    GET /api/v1/progress/exercises-overview/
+
+    Returns all published lessons that have at least one active exercise,
+    ordered by unit then lesson, with per-lesson aggregate progress for
+    the authenticated student.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from collections import defaultdict
+        from django.db.models import Count, Q
+
+        user = request.user
+
+        # All published lessons with at least one active exercise
+        lessons = (
+            Lesson.objects
+            .filter(is_published=True, exercises__is_active=True)
+            .distinct()
+            .select_related("unit__grade")
+            .order_by("unit__order", "order")
+        )
+        lesson_ids = [l.id for l in lessons]
+
+        # Total distinct exercise categories per lesson
+        cat_counts = (
+            Exercise.objects
+            .filter(lesson_id__in=lesson_ids, is_active=True)
+            .values("lesson_id")
+            .annotate(total=Count("category", distinct=True))
+        )
+        cat_count_map = {row["lesson_id"]: row["total"] for row in cat_counts}
+
+        # Student's CategoryProgress — completed = medium_cleared OR hard_cleared
+        completed_by_lesson: dict[int, int] = defaultdict(int)
+        for cp in CategoryProgress.objects.filter(student=user, lesson_id__in=lesson_ids):
+            if cp.medium_cleared or cp.hard_cleared:
+                completed_by_lesson[cp.lesson_id] += 1
+
+        # Exercises attempted per lesson
+        attempt_count_map: dict[int, int] = {}
+        for row in (
+            ExerciseAttempt.objects
+            .filter(student=user, exercise__lesson_id__in=lesson_ids)
+            .values("exercise__lesson_id")
+            .annotate(count=Count("id"))
+        ):
+            attempt_count_map[row["exercise__lesson_id"]] = row["count"]
+
+        results = [
+            {
+                "lesson_id": lesson.id,
+                "lesson_title": lesson.title,
+                "unit_id": lesson.unit_id,
+                "unit_title": lesson.unit.title,
+                "unit_order": lesson.unit.order,
+                "lesson_order": lesson.order,
+                "total_categories": cat_count_map.get(lesson.id, 0),
+                "completed_categories": completed_by_lesson.get(lesson.id, 0),
+                "exercises_attempted": attempt_count_map.get(lesson.id, 0),
+            }
+            for lesson in lessons
+        ]
+
+        return Response({"lessons": results})
+
+
+# ─── Tests overview ───────────────────────────────────────────────────────────
+
+class TestsOverviewView(APIView):
+    """
+    GET /api/v1/progress/tests-overview/
+
+    Returns all published lesson tests (scope=lesson) ordered by lesson
+    sequence, with the authenticated student's best attempt status.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count, Max, Q
+
+        user = request.user
+
+        tests = (
+            Test.objects
+            .filter(scope=Test.Scope.LESSON, is_published=True, lesson__is_published=True)
+            .select_related("lesson__unit__grade")
+            .order_by("lesson__unit__order", "lesson__order")
+        )
+        test_ids = [t.id for t in tests]
+
+        # Best attempt per test: passed (any) → score → most recent
+        attempt_stats = (
+            TestAttempt.objects
+            .filter(
+                student=user,
+                test_id__in=test_ids,
+                status=TestAttempt.Status.COMPLETED,
+            )
+            .values("test_id")
+            .annotate(
+                attempts_count=Count("id"),
+                passed_count=Count("id", filter=models.Q(passed=True)),
+                best_score=models.Max("score"),
+            )
+        )
+        attempt_map = {row["test_id"]: row for row in attempt_stats}
+
+        results = []
+        for test in tests:
+            a = attempt_map.get(test.id)
+            results.append({
+                "test_id": test.id,
+                "lesson_id": test.lesson_id,
+                "lesson_title": test.lesson.title,
+                "unit_id": test.lesson.unit_id,
+                "unit_title": test.lesson.unit.title,
+                "unit_order": test.lesson.unit.order,
+                "lesson_order": test.lesson.order,
+                "pass_threshold": test.pass_threshold,
+                "time_limit_minutes": test.time_limit_minutes,
+                "attempts_count": a["attempts_count"] if a else 0,
+                "passed": bool(a["passed_count"]) if a else None,
+                "best_score": float(a["best_score"]) if a and a["best_score"] is not None else None,
+            })
+
+        return Response({"tests": results})
+
+# ─── Admin exercise preview instance ─────────────────────────────────────────
+
+class ExercisePreviewInstanceView(APIView):
+    """
+    GET /api/v1/progress/exercises/<exercise_id>/preview-instance/
+
+    Admin-only. Generates and returns one random instance from the
+    exercise template — same format as the practice endpoint, so the
+    frontend can render it with the exact same ExerciseCard component.
+
+    Does NOT record any attempt or session data.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, exercise_id):
+        try:
+            exercise = Exercise.objects.select_related("lesson").get(id=exercise_id)
+        except Exercise.DoesNotExist:
+            return Response({"error": "Exercițiul nu există."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            instance = generate_instance(exercise)
+        except Exception as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            "instance": instance,
+            "exercise_id": exercise.id,
+            "lesson_title": exercise.lesson.title,
+            "exercise_type": exercise.exercise_type,
+            "difficulty": exercise.difficulty,
+            "category": exercise.category or "",
+        })

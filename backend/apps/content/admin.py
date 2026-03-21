@@ -1,3 +1,6 @@
+import json
+
+from django.conf import settings
 from django.contrib import admin
 from django.utils.html import format_html
 
@@ -23,7 +26,7 @@ class LessonInline(admin.TabularInline):
     extra = 0
     fields = ("order", "title", "is_published", "practice_minimum")
     ordering = ("order",)
-    show_change_link = True  # Link to full lesson edit page
+    show_change_link = True
 
 
 class TestInline(admin.StackedInline):
@@ -63,8 +66,6 @@ class UnitAdmin(admin.ModelAdmin):
 
 
 class ExerciseInline(admin.StackedInline):
-    """Stacked inline gives more room for the JSON template field."""
-
     model = Exercise
     extra = 0
     fields = ("exercise_type", "difficulty", "template", "is_active")
@@ -78,7 +79,7 @@ class LessonAdmin(admin.ModelAdmin):
     list_editable = ("is_published",)
     search_fields = ("title",)
     inlines = [ExerciseInline]
-    save_on_top = True  # Save button at top too — useful for long content
+    save_on_top = True
 
     fieldsets = (
         (None, {"fields": ("unit", "order", "title")}),
@@ -113,13 +114,10 @@ class LessonAdmin(admin.ModelAdmin):
 
 @admin.register(Exercise)
 class ExerciseAdmin(admin.ModelAdmin):
-    list_display = ("exercise_title", "exercise_type", "difficulty", "is_active", "lesson_display")
+    list_display = ("exercise_title", "exercise_type", "difficulty", "category", "is_active", "lesson_display", "preview_link")
     list_filter = ("exercise_type", "difficulty", "is_active", "lesson__unit__grade")
-    search_fields = ("lesson__title", "template")
-
-    @admin.display(description="Title")
-    def exercise_title(self, obj):
-        return obj.template.get("title") or f"({obj.exercise_type}) — {obj.lesson.title}"
+    search_fields = ("lesson__title", "category")
+    readonly_fields = ("preview_link",)
 
     fieldsets = (
         (None, {"fields": ("lesson", "exercise_type", "difficulty", "category")}),
@@ -129,22 +127,39 @@ class ExerciseAdmin(admin.ModelAdmin):
                 "fields": ("template",),
                 "description": format_html(
                     "<strong>Template format examples:</strong><br><br>"
-                    "<strong>Multiple Choice:</strong><br>"
-                    '<code>{{"question": "Cât este $2 + 3$?", "choices": ["4", "5", "6", "7"], '
-                    '"correct_index": 1}}</code><br><br>'
                     "<strong>Fill in the Blank:</strong><br>"
-                    '<code>{{"question": "Calculează: $a + b$ = ?", "params": {{"a": [1, 50], "b": [1, 50]}}, '
-                    '"answer_formula": "a + b"}}</code><br><br>'
-                    "<strong>Expression Input:</strong><br>"
-                    '<code>{{"question": "Simplifică fracția $\\\\frac{{12}}{{8}}$", '
-                    '"correct_answer": "\\\\frac{{3}}{{2}}"}}</code><br><br>'
-                    "<strong>True/False:</strong><br>"
-                    '<code>{{"statement": "$15$ este număr prim", "correct_answer": false}}</code>'
+                    '<code>{{"question": "Calculează: ${{a}} + {{b}}$ = ?", "params": {{"a": {{"type": "randint", "min": 1, "max": 50}}, "b": {{"type": "randint", "min": 1, "max": 50}}}}, '
+                    '"answer_expr": "{{a}} + {{b}}"}}</code>'
                 ),
+            },
+        ),
+        (
+            "Preview",
+            {
+                "fields": ("preview_link",),
+                "description": "Opens the exercise in the frontend with real KaTeX rendering and live answer checking.",
             },
         ),
         ("Status", {"fields": ("is_active",)}),
     )
+
+    @admin.display(description="Preview")
+    def preview_link(self, obj):
+        if not obj.pk:
+            return "Salvează exercițiul mai întâi."
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+        url = f"{frontend_url}/admin-preview/exercise/{obj.pk}"
+        return format_html(
+            '<a href="{}" target="_blank" '
+            'style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;'
+            'background:#4f46e5;color:#fff;border-radius:6px;font-size:12px;text-decoration:none;font-weight:600;">'
+            "🔍 Preview în aplicație</a>",
+            url,
+        )
+
+    @admin.display(description="Title")
+    def exercise_title(self, obj):
+        return obj.template.get("title") or f"({obj.exercise_type}) — {obj.lesson.title}"
 
     @admin.display(description="Lesson")
     def lesson_display(self, obj):

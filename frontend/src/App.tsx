@@ -12,6 +12,9 @@ import GradePage from "@/pages/GradePage";
 import PracticePage from "@/pages/PracticePage"
 import TestPage from "@/pages/TestPage";
 import ExerciseHubPage from "@/pages/ExerciseHubPage";
+import ExercisesOverviewPage from "@/pages/ExercisesOverviewPage";
+import TestsOverviewPage from "@/pages/TestsOverviewPage";
+import AdminPreviewPage from "@/pages/AdminPreviewPage";
 
 /**
  * Redirects authenticated users away from auth pages (login, register).
@@ -58,6 +61,10 @@ function AppRoutes() {
       <Route path="/lesson/:lessonId/practice" element={ <ProtectedRoute><PracticePage /></ProtectedRoute>} />
       <Route path="/test/:testId" element={<ProtectedRoute><TestPage /></ProtectedRoute>} />
       <Route path="/lesson/:lessonId/exercises" element={<ProtectedRoute><ExerciseHubPage /></ProtectedRoute>} />
+      <Route path="/exercises" element={<ProtectedRoute><ExercisesOverviewPage /></ProtectedRoute>} />
+      <Route path="/tests" element={<ProtectedRoute><TestsOverviewPage /></ProtectedRoute>} />
+      <Route path="/admin-preview/exercise/:exerciseId" element={<ProtectedRoute><AdminPreviewPage /></ProtectedRoute>} />
+
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

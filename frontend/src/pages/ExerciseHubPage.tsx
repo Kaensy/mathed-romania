@@ -12,7 +12,7 @@
  *   Completing Hard also earns a bonus reward (shown as ⭐)
  */
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { ArrowLeft, Lock, Star, CheckCircle, ChevronRight } from "lucide-react";
 import api from "@/api/client";
 import type { CategoryInfo, Difficulty, LessonCategoriesResponse, TierState } from "@/types/progress";
@@ -36,6 +36,9 @@ export default function ExerciseHubPage() {
   const [data, setData] = useState<LessonCategoriesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const location = useLocation();
+  const fromOverview = location.state?.from === "exercises-overview";
 
   useEffect(() => {
     if (!lessonId) return;
@@ -70,13 +73,17 @@ export default function ExerciseHubPage() {
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
-          <Link
-            to={`/lesson/${lessonId}`}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Înapoi la lecție</span>
-          </Link>
+          {fromOverview ? (
+  <Link to="/exercises" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors">
+    <ArrowLeft className="w-4 h-4" />
+    <span>Înapoi la Exerciții</span>
+  </Link>
+) : (
+  <Link to={`/lesson/${lessonId}`} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors">
+    <ArrowLeft className="w-4 h-4" />
+    <span>Înapoi la lecție</span>
+  </Link>
+)}
         </div>
       </div>
 

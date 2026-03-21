@@ -92,36 +92,101 @@ _TOKEN_SALT = "mathed-exercise-instance-v1"
 # ─── Parameter generators ─────────────────────────────────────────────────────
 
 def _generate_params(params_spec: dict) -> dict:
+    """
+    Resolve all param specs into concrete values.
+
+    Supports four types:
+      randint       — random integer between min and max (both can be expressions)
+      randint_nonzero — same but never zero
+      choice        — random element from a list
+      fixed         — constant value
+      computed      — Python expression evaluated after all others are resolved
+      label         — maps a resolved param's value to a display string
+
+    Dependency resolution:
+      - Passes 1 & 2 retry until all non-computed/non-label params resolve,
+        so a randint whose bounds reference another randint works correctly.
+      - Pass 3 retries computed params until all chain dependencies resolve,
+        so computed params can depend on other computed params (e.g. x → a, b).
+      - Pass 4 resolves labels last, after everything else is settled.
+    """
     result: dict[str, Any] = {}
 
-    # Two-pass: non-computed first, computed second.
-    # This makes declaration order irrelevant.
-    for name, spec in params_spec.items():
-        t = spec["type"]
-        if t == "computed":
-            continue
-        if t == "randint":
-            result[name] = random.randint(spec["min"], spec["max"])
-        elif t == "randint_nonzero":
-            v = 0
-            while v == 0:
-                v = random.randint(spec["min"], spec["max"])
-            result[name] = v
-        elif t == "choice":
-            result[name] = random.choice(spec["options"])
-        elif t == "fixed":
-            result[name] = spec["value"]
-        else:
-            raise ValueError(f"Unknown param type: {t}")
+    def _eval_expr(expr, current: dict) -> int:
+        """Substitute resolved params into an expression string and eval it."""
+        s = str(expr)
+        for k, v in current.items():
+            s = s.replace(f"{{{k}}}", str(v))
+        return int(eval(s))  # safe: only math ops on integers
 
+    # ── Passes 1 & 2: resolve randint / choice / fixed (with retry) ──────────
+    simple_types = {"randint", "randint_nonzero", "choice", "fixed"}
+    pending = {n: s for n, s in params_spec.items() if s["type"] in simple_types}
+
+    max_iterations = len(pending) + 1
+    for _ in range(max_iterations):
+        if not pending:
+            break
+        made_progress = False
+        for name, spec in list(pending.items()):
+            if name in result:
+                del pending[name]
+                continue
+            t = spec["type"]
+            try:
+                if t == "randint":
+                    lo = _eval_expr(spec["min"], result)
+                    hi = _eval_expr(spec["max"], result)
+                    result[name] = random.randint(lo, hi)
+                elif t == "randint_nonzero":
+                    lo = _eval_expr(spec["min"], result)
+                    hi = _eval_expr(spec["max"], result)
+                    v = 0
+                    while v == 0:
+                        v = random.randint(lo, hi)
+                    result[name] = v
+                elif t == "choice":
+                    result[name] = random.choice(spec["options"])
+                elif t == "fixed":
+                    result[name] = spec["value"]
+                del pending[name]
+                made_progress = True
+            except (KeyError, NameError, ValueError):
+                # A bound references a param not yet resolved — retry next round
+                continue
+        if not made_progress:
+            # Remaining params have unresolvable dependencies
+            unresolved = list(pending.keys())
+            raise ValueError(f"Cannot resolve params (circular or missing dependency): {unresolved}")
+
+    # ── Pass 3: computed params (retry until all chain dependencies resolve) ──
+    computed = {n: s for n, s in params_spec.items() if s["type"] == "computed"}
+    max_iterations = len(computed) + 1
+    for _ in range(max_iterations):
+        if all(n in result for n in computed):
+            break
+        made_progress = False
+        for name, spec in computed.items():
+            if name in result:
+                continue
+            try:
+                result[name] = _eval_expr(spec["expr"], result)
+                made_progress = True
+            except (KeyError, NameError, ValueError):
+                continue  # dependency not yet resolved — retry
+        if not made_progress:
+            unresolved = [n for n in computed if n not in result]
+            raise ValueError(f"Cannot resolve computed params (circular or missing dependency): {unresolved}")
+
+    # ── Pass 4: label params (always last — source must already be resolved) ──
     for name, spec in params_spec.items():
-        if spec["type"] != "computed":
+        if spec["type"] != "label":
             continue
-        expr = spec["expr"]
-        filled = expr
-        for key, value in result.items():
-            filled = filled.replace(f"{{{key}}}", str(value))
-        result[name] = eval(filled)  # safe: only math ops on integers
+        source_val = str(result[spec["source"]])
+        mapping = spec["map"]
+        if source_val not in mapping:
+            raise ValueError(f"Label param '{name}': no mapping for value '{source_val}'")
+        result[name] = mapping[source_val]
 
     return result
 
@@ -137,20 +202,26 @@ def _fill(template_str: str, params: dict) -> str:
 # ─── Per-type instance builders ───────────────────────────────────────────────
 
 def _build_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
-    """
-    Returns (frontend_payload, grading_data).
-    frontend_payload contains everything the UI needs except the answer.
-    grading_data contains what the grading engine needs.
-    """
     frontend = {
         "question": _fill(template["question"], params),
         "answer_input": template.get("answer_input", "expression"),
         "hint": template.get("hint"),
         "placeholder": template.get("placeholder", "Răspuns..."),
     }
-    grading = {
-        "correct_expr": _fill(template["answer_expr"], params),
-    }
+
+    # ── Set-membership grading ────────────────────────────────────────────
+    if "valid_set_expr" in template:
+        expr = _fill(template["valid_set_expr"], params)
+        valid_set = list(eval(expr, {"__builtins__": {}}, {"range": range}))
+        grading = {
+            "valid_set": valid_set,
+            "answer_display": template.get("answer_display", ""),
+        }
+    else:
+        grading = {
+            "correct_expr": _fill(template["answer_expr"], params),
+        }
+
     return frontend, grading
 
 def _build_multi_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
@@ -357,6 +428,10 @@ def generate_instance(exercise) -> dict:
         "instance_token": instance_token,
         **frontend_data,
     }
+
+    # Pass through display_mode if set in template
+    if "display_mode" in template:
+        instance["display_mode"] = template["display_mode"]
 
     return instance
 
