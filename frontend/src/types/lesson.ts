@@ -1,32 +1,4 @@
-// Lesson block type definitions
-// Mirrors BLOCK_SCHEMA.md exactly — keep in sync.
-
-export interface WorkedExampleStep {
-  explanation: string; // text with optional inline $math$
-  latex?: string;      // optional block equation for this step
-}
-
-export interface WorkedExampleMethod {
-  title: string;
-  steps: WorkedExampleStep[];
-}
-
-export interface Property {
-  name: string;
-  symbolic: string; // KaTeX expression
-  example: string;  // text with inline $math$
-}
-
-export interface MergedTable {
-   type: "merged_table";
-   title?: string;
-   column_groups: { label: string; columns: number }[];
-   subheaders: string[];
-   rows: string[][];
-   footer_groups?: { label: string; columns: number }[];
- }
-
-// ─── Block types ────────────────────────────────────────────────────────────
+// ─── Block types ─────────────────────────────────────────────────────────────
 
 export interface ParagraphBlock {
   type: "paragraph";
@@ -35,13 +7,13 @@ export interface ParagraphBlock {
 
 export interface DefinitionBox {
   type: "definition_box";
-  title?: string; // defaults to "Definiție"
+  title?: string;
   text: string;
 }
 
 export interface ObservationBox {
   type: "observation_box";
-  title?: string; // defaults to "Observație"
+  title?: string;
   text: string;
 }
 
@@ -49,6 +21,7 @@ export interface FormulaCard {
   type: "formula_card";
   title?: string;
   latex: string;
+  explanation?: string;
 }
 
 export interface RealWorldBox {
@@ -58,7 +31,7 @@ export interface RealWorldBox {
 
 export interface WarningBox {
   type: "warning_box";
-  title?: string; // defaults to "Atenție!"
+  title?: string;
   text: string;
 }
 
@@ -67,9 +40,19 @@ export interface BlockEquation {
   latex: string;
 }
 
+export interface WorkedExampleStep {
+  explanation: string;
+  latex?: string;
+}
+
 export interface WorkedExample {
   type: "worked_example";
   problem: string;
+  steps: WorkedExampleStep[];
+}
+
+export interface WorkedExampleMethod {
+  title: string;
   steps: WorkedExampleStep[];
 }
 
@@ -77,6 +60,12 @@ export interface WorkedExampleMulti {
   type: "worked_example_multi";
   problem: string;
   methods: WorkedExampleMethod[];
+}
+
+export interface Property {
+  name: string;
+  latex?: string;
+  example?: string;
 }
 
 export interface PropertiesList {
@@ -92,10 +81,16 @@ export interface SummaryTable {
   rows: string[][];
 }
 
+export interface MergedTable {
+  type: "merged_table";
+  title?: string;
+  headers: string[];
+  rows: (string | { text: string; colspan?: number; rowspan?: number })[][];
+}
+
 export interface CollapsibleSection {
   type: "collapsible";
   title: string;
-  // Nested blocks — any type except another collapsible
   blocks: Exclude<LessonBlock, CollapsibleSection>[];
 }
 
@@ -113,8 +108,6 @@ export interface InteractiveComponent {
   config: Record<string, unknown>;
 }
 
-// ─── Union type ──────────────────────────────────────────────────────────────
-
 export type LessonBlock =
   | ParagraphBlock
   | DefinitionBox
@@ -127,41 +120,11 @@ export type LessonBlock =
   | WorkedExampleMulti
   | PropertiesList
   | SummaryTable
+  | MergedTable
   | CollapsibleSection
-  | InteractiveComponent
-  | MergedTable;
+  | InteractiveComponent;
 
-// ─── Lesson API types ────────────────────────────────────────────────────────
-
-export interface LessonListItem {
-  id: number;
-  order: number;
-  title: string;
-  summary: string;
-  practice_minimum: number;
-  exercise_count: number;
-  is_locked: boolean;
-  lesson_test_id: number | null;
-}
-
-export interface LessonDetail {
-  id: number;
-  order: number;
-  title: string;
-  summary: string;
-  blocks: LessonBlock[];
-  practice_minimum: number;
-  unit_id: number;
-  unit_title: string;
-  unit_order: number;
-  grade_number: number;
-  prev_lesson_id: number | null;
-  next_lesson_id: number | null;
-  exercises: Exercise[];
-  glossary_terms: GlossaryTerm[];
-  updated_at: string;
-  lesson_test_id: number | null;
-}
+// ─── API types ────────────────────────────────────────────────────────────────
 
 export interface Exercise {
   id: number;
@@ -176,18 +139,89 @@ export interface GlossaryTerm {
   definition: string;
 }
 
+export interface TestInfo {
+  id: number;
+  scope: string;
+  pass_threshold: number;
+  time_limit_minutes: number | null;
+  composition: unknown[];
+}
+
+// ─── Lesson ───────────────────────────────────────────────────────────────────
+
+export interface LessonListItem {
+  id: number;
+  order: number;
+  title: string;
+  summary: string;
+  topic_id: number;
+  topic_test_id: number | null;
+  is_locked: boolean;
+}
+
+export interface LessonDetail {
+  id: number;
+  order: number;
+  title: string;
+  summary: string;
+  blocks: LessonBlock[];
+  // Topic context
+  topic_id: number;
+  topic_title: string;
+  topic_order: number;
+  topic_test_id: number | null;
+  topic_exercise_count: number;
+  // Unit / grade context
+  unit_id: number;
+  unit_title: string;
+  unit_order: number;
+  grade_number: number;
+  // Navigation
+  prev_lesson_id: number | null;
+  next_lesson_id: number | null;
+  glossary_terms: GlossaryTerm[];
+  updated_at: string;
+}
+
+// ─── Topic ────────────────────────────────────────────────────────────────────
+
+export interface TopicListItem {
+  id: number;
+  order: number;
+  title: string;
+  description: string;
+  is_published: boolean;
+  practice_minimum: number;
+  exercise_count: number;
+  lessons: LessonListItem[];
+  test: TestInfo | null;
+}
+
+// ─── Unit ─────────────────────────────────────────────────────────────────────
+
 export interface UnitDetail {
   id: number;
   order: number;
   title: string;
   description: string;
   recommended_unlock_date: string | null;
-  lesson_count: number;
-  lessons: LessonListItem[];
-  test: {
-    id: number;
-    pass_threshold: number;
-    time_limit_minutes: number | null;
-    exercise_count: number;
-  } | null;
+  topic_count: number;
+  topics: TopicListItem[];
+  test: TestInfo | null;
+}
+
+// ─── Grade ────────────────────────────────────────────────────────────────────
+
+export interface GradeDetail {
+  id: number;
+  number: number;
+  name: string;
+  units: UnitDetail[];
+}
+
+export interface GradeListItem {
+  id: number;
+  number: number;
+  name: string;
+  unit_count: number;
 }

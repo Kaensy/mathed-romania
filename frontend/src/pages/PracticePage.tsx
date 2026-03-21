@@ -1,8 +1,8 @@
 /**
- * PracticePage — exercise session for a lesson.
+ * PracticePage — exercise session for a topic.
  *
- * Route: /lesson/:lessonId/practice
- * Params: ?category=<slug>&difficulty=<easy|medium|hard>
+ * Route: /topic/:topicId/practice
+ * State: { category?: string, difficulty?: Difficulty }  (passed via navigate)
  *
  * Flow:
  *   1. Fetch a batch of 5 randomised exercises (filtered by category + difficulty)
@@ -10,18 +10,15 @@
  *   3. Submit each answer with the batch's session_id; show immediate feedback
  *   4. On completion, show results + whether a tier was cleared
  */
-import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle, XCircle, ChevronRight, Trophy, RotateCcw, Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
+import { ArrowLeft, Trophy, RotateCcw, Star } from "lucide-react";
 import api from "@/api/client";
-import { InlineMath } from "@/lib/math";
 import type {
-  AttemptResult,
   Difficulty,
   ExerciseInstance,
   PracticeSession,
 } from "@/types/progress";
-
 import ExerciseCard from "@/components/exercise/ExerciseCard";
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
@@ -33,12 +30,13 @@ const DIFFICULTY_LABEL: Record<Difficulty, string> = {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PracticePage() {
-  const { lessonId } = useParams<{ lessonId: string }>();
+  const { topicId } = useParams<{ topicId: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
 
-  const category = searchParams.get("category");
-  const difficulty = searchParams.get("difficulty") as Difficulty | null;
+  // Category and difficulty come from navigation state (set by ExerciseHubPage)
+  const category = (location.state as any)?.category as string | null ?? null;
+  const difficulty = (location.state as any)?.difficulty as Difficulty | null ?? null;
 
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -52,19 +50,19 @@ export default function PracticePage() {
     answer: string | string[];
   }[]>([]);
 
-  // The tier that was cleared during this session (from the last attempt response)
   const [tierCleared, setTierCleared] = useState<Difficulty | null>(null);
 
   const fetchSession = () => {
-    if (!lessonId) return;
+    if (!topicId) return;
     setLoading(true);
     setError(null);
+
     const params = new URLSearchParams({ count: "5" });
     if (category !== null) params.set("category", category);
     if (difficulty !== null) params.set("difficulty", difficulty);
 
     api
-      .get<PracticeSession>(`/progress/lessons/${lessonId}/practice/?${params}`)
+      .get<PracticeSession>(`/progress/topics/${topicId}/practice/?${params}`)
       .then((res) => setSession(res.data))
       .catch(() => setError("Nu am putut încărca exercițiile. Încearcă din nou."))
       .finally(() => setLoading(false));
@@ -72,7 +70,7 @@ export default function PracticePage() {
 
   useEffect(() => {
     fetchSession();
-  }, [lessonId]);
+  }, [topicId]);
 
   const handleAnswerResult = (
     isCorrect: boolean,
@@ -136,7 +134,7 @@ export default function PracticePage() {
         isPerfect={isPerfect}
         tierCleared={tierCleared}
         onRestart={handleRestart}
-        lessonId={lessonId!}
+        topicId={topicId!}
         category={category}
       />
     );
@@ -151,7 +149,7 @@ export default function PracticePage() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(`/topic/${topicId}/exercises`)}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -199,7 +197,7 @@ interface CompletionScreenProps {
   isPerfect: boolean;
   tierCleared: Difficulty | null;
   onRestart: () => void;
-  lessonId: string;
+  topicId: string;
   category: string | null;
 }
 
@@ -209,7 +207,7 @@ function CompletionScreen({
   isPerfect,
   tierCleared,
   onRestart,
-  lessonId,
+  topicId,
   category,
 }: CompletionScreenProps) {
   return (
@@ -231,7 +229,6 @@ function CompletionScreen({
           exerciții.
         </p>
 
-        {/* Tier cleared banner */}
         {tierCleared && (
           <div className="mb-6 flex items-center gap-2 justify-center bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
             <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
@@ -250,7 +247,7 @@ function CompletionScreen({
             Încearcă din nou
           </button>
           <Link
-            to={`/lesson/${lessonId}/exercises${category !== null ? `?back=1` : ""}`}
+            to={`/topic/${topicId}/exercises`}
             className="w-full py-3 border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors block"
           >
             Înapoi la exerciții

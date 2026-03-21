@@ -1,20 +1,21 @@
 """
-Seeds the Grade 5 curriculum structure based on the project reference document.
+Seeds the Grade 5 curriculum structure based
 
-Creates: 1 Grade, 8 Units, ~33 Lessons (with placeholder content), 8 Tests.
-Lessons are created with titles and empty content — actual lesson content
-is written via the Django admin CMS.
+Creates: 1 Grade, 8 Units, Topics (one per lesson), Lessons, 8 Unit Tests.
 
-Usage:
-    python manage.py seed_grade5
-    python manage.py seed_grade5 --flush  # Deletes existing Grade 5 data first
+After running this seed, use Django admin to:
+  1. Merge split topics (e.g. combine lesson-4 and lesson-5 topics into
+     one "Adunarea numerelor naturale" topic for Unit 1)
+  2. Set topic titles for merged topics
+  3. Publish topics as content is ready
+
 """
 from django.core.management.base import BaseCommand
 
-from apps.content.models import Grade, Lesson, Test, Unit
+from apps.content.models import Grade, Lesson, Test, Topic, Unit
 
 
-# Full Grade 5 curriculum from the reference document
+# Full Grade 5 curriculum
 GRADE_5_CURRICULUM = [
     {
         "order": 1,
@@ -24,15 +25,20 @@ GRADE_5_CURRICULUM = [
             ("Scrierea și citirea numerelor naturale", "Writing and reading natural numbers"),
             ("Reprezentarea pe axa numerelor; compararea și ordonarea", "Number line representation; comparing and ordering"),
             ("Aproximări și probleme de estimare", "Approximations and estimation problems"),
-            ("Adunarea numerelor naturale; proprietăți", "Addition of natural numbers; properties"),
+            ("Adunarea numerelor naturale: calcul și proprietăți", "Addition of natural numbers; properties"),
+            ("Adunarea numerelor naturale: suma lui Gauss", "Addition: Gauss sum and arithmetic sequences"),
             ("Scăderea numerelor naturale", "Subtraction of natural numbers"),
-            ("Înmulțirea numerelor naturale; proprietăți; factor comun", "Multiplication; properties; common factor"),
-            ("Împărțirea cu rest 0 și cu rest a numerelor naturale; teorema împărțirii", "Division with and without remainder; division theorem"),
-            ("Ridicarea la putere cu exponent natural; reguli de calcul cu puteri; pătratul și cubul", "Powers with natural exponent; calculation rules; squares and cubes"),
+            ("Înmulțirea numerelor naturale: calcul și proprietăți", "Multiplication: calculation and properties"),
+            ("Înmulțirea numerelor naturale: distributivitate și factori comuni", "Multiplication: distributivity and common factors"),
+            ("Împărțirea exactă a numerelor naturale", "Exact division of natural numbers"),
+            ("Împărțirea cu rest", "Division with remainder; division theorem"),
+            ("Puterea cu exponent natural: definiție și reguli de calcul", "Powers: definition and calculation rules"),
+            ("Puterea cu exponent natural: ultima cifră și suma puterilor", "Powers: last digit and sum of powers"),
+            ("Puterea cu exponent natural: compararea și pătrate perfecte", "Powers: comparing and perfect squares"),
             ("Baze de numerație: scrierea în baza 10 și baza 2", "Number bases: writing in base 10 and base 2"),
             ("Ordinea efectuării operațiilor", "Order of operations"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 45, "exercise_count": 15},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 45},
     },
     {
         "order": 2,
@@ -45,77 +51,72 @@ GRADE_5_CURRICULUM = [
             ("Metoda mersului invers", "Reverse/working backwards method"),
             ("Metoda falsei ipoteze", "False hypothesis method"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 40, "exercise_count": 10},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 40},
     },
     {
         "order": 3,
         "title": "Divizibilitatea Numerelor Naturale",
         "description": "Divisibility of Natural Numbers — divisors, multiples, divisibility criteria, primes.",
         "lessons": [
-            ("Noțiunea de divizor și multiplu", "Concept of divisor and multiple"),
-            ("Divizori comuni; multipli comuni", "Common divisors; common multiples"),
-            ("Criteriile de divizibilitate cu 2, 5 și 10", "Divisibility criteria for 2, 5, and 10"),
-            ("Criteriile de divizibilitate cu 3 și 9", "Divisibility criteria for 3 and 9"),
-            ("Numere prime și numere compuse", "Prime and composite numbers"),
+            ("Mulțimea divizorilor și mulțimea multiplilor unui număr natural", "Divisors and multiples"),
+            ("Criterii de divizibilitate cu 2, 5, 10, 3, 9", "Divisibility criteria"),
+            ("Numere prime și numere compuse; descompunerea în factori primi", "Primes; prime factorization"),
+            ("Cel mai mare divizor comun (c.m.m.d.c.)", "Greatest common divisor"),
+            ("Cel mai mic multiplu comun (c.m.m.m.c.)", "Least common multiple"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 40, "exercise_count": 10},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 45},
     },
     {
         "order": 4,
-        "title": "Fracții Ordinare",
-        "description": "Ordinary Fractions — concepts, representation, operations, powers, percentages.",
+        "title": "Fracții",
+        "description": "Fractions — concepts, operations, and comparisons.",
         "lessons": [
-            ("Fracții ordinare: fracții echiunitare, subunitare, supraunitare; comparare", "Ordinary fractions: unit, proper, improper; comparison"),
-            ("Reprezentarea pe axa numerelor; introducerea și scoaterea întregilor", "Number line; introducing and extracting whole parts"),
-            ("Amplificarea fracțiilor", "Amplifying fractions"),
-            ("Simplificarea fracțiilor; CMMDC", "Simplifying fractions; GCD"),
-            ("Aducerea la numitor comun; CMMMC", "Common denominator; LCM"),
-            ("Adunarea și scăderea fracțiilor ordinare", "Addition and subtraction of ordinary fractions"),
-            ("Înmulțirea și împărțirea fracțiilor ordinare", "Multiplication and division of ordinary fractions"),
-            ("Puterea cu exponent natural a unei fracții; fracții/procente dintr-un număr", "Powers of fractions; fractions/percentages of a number"),
+            ("Fracții; fracții subunitare, echiunitare, supraunitare", "Fractions; sub-unitary, unitary, super-unitary"),
+            ("Fracții echivalente; simplificarea și amplificarea fracțiilor", "Equivalent fractions; simplification and amplification"),
+            ("Compararea și ordonarea fracțiilor", "Comparing and ordering fractions"),
+            ("Adunarea și scăderea fracțiilor", "Addition and subtraction of fractions"),
+            ("Înmulțirea fracțiilor", "Multiplication of fractions"),
+            ("Împărțirea fracțiilor", "Division of fractions"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 50, "exercise_count": 15},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 45},
     },
     {
         "order": 5,
-        "title": "Fracții Zecimale",
-        "description": "Decimal Fractions — operations, conversions, arithmetic mean, rational numbers.",
+        "title": "Numere Raționale Pozitive",
+        "description": "Positive Rational Numbers — decimal fractions, operations, and applications.",
         "lessons": [
-            ("Fracții zecimale: concept, comparare, ordonare, reprezentare pe axă", "Decimal fractions: concept, comparison, ordering, number line"),
-            ("Aproximări la ordinul zecimilor/sutimilor", "Approximations to tenths/hundredths"),
-            ("Adunarea și scăderea fracțiilor zecimale finite", "Addition and subtraction of finite decimal fractions"),
-            ("Înmulțirea fracțiilor zecimale finite; puterea cu exponent natural", "Multiplication; powers with natural exponent"),
-            ("Împărțirea unei fracții zecimale la un număr natural nenul", "Dividing a decimal fraction by a nonzero natural number"),
-            ("Împărțirea a două fracții zecimale finite nenule", "Dividing two nonzero finite decimal fractions"),
-            ("Transformări între fracții ordinare și zecimale; fracții zecimale periodice", "Conversions between ordinary and decimal fractions; periodic decimals"),
-            ("Media aritmetică; număr rațional pozitiv; ordinea operațiilor cu numere raționale pozitive", "Arithmetic mean; positive rational numbers; order of operations"),
+            ("Fracții zecimale; scrierea și citirea", "Decimal fractions; writing and reading"),
+            ("Operații cu fracții zecimale: adunare și scădere", "Operations with decimal fractions: addition and subtraction"),
+            ("Operații cu fracții zecimale: înmulțire și împărțire", "Operations: multiplication and division"),
+            ("Fracții ordinare și fracții zecimale; conversii", "Ordinary and decimal fractions; conversions"),
+            ("Aproximări și rotunjiri ale numerelor raționale pozitive", "Approximations and rounding of positive rationals"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 50, "exercise_count": 15},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 45},
     },
     {
         "order": 6,
-        "title": "Probleme Practice",
-        "description": "Practical Problems — fraction word problems, data organization, statistics.",
+        "title": "Procente",
+        "description": "Percentages — concepts, calculations, and applications.",
         "lessons": [
-            ("Metode aritmetice pentru rezolvarea problemelor cu fracții", "Arithmetic methods for fraction problems"),
-            ("Probleme de organizarea datelor; frecvență; date statistice în tabele și grafice", "Data organization; frequency; statistical data in tables and graphs"),
-            ("Media unui set de date statistice", "Mean of a statistical data set"),
+            ("Procentul; semnificație și reprezentare", "Percentages; meaning and representation"),
+            ("Calculul procentului dintr-un număr; aflarea numărului când se cunoaște procentul", "Calculating a percentage; finding the number from the percentage"),
+            ("Probleme cu procente", "Problems with percentages"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 40, "exercise_count": 10},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 40},
     },
     {
         "order": 7,
         "title": "Elemente de Geometrie",
-        "description": "Geometry Elements — points, lines, segments, angles, symmetry.",
+        "description": "Geometry — points, lines, angles, symmetry, and congruence.",
         "lessons": [
-            ("Punct, dreaptă, plan, semidreaptă, segment; poziții relative", "Points, lines, planes, rays, segments; relative positions"),
+            ("Punct, dreaptă, plan, semidreaptă, segment; poziții relative", "Points, lines, planes, rays, segments"),
             ("Lungimea unui segment; segmente congruente; mijlocul segmentului", "Segment length; congruent segments; midpoint"),
             ("Unghiul: definiție, măsură, unghiuri congruente", "Angles: definition, measurement, congruent angles"),
-            ("Clasificări de unghiuri: drept, ascuțit, obtuz, nul, alungit", "Angle classification: right, acute, obtuse, null, straight"),
-            ("Calcule cu măsuri de unghiuri în grade și minute sexagesimale", "Calculations with angle measures in degrees and minutes"),
-            ("Figuri congruente; simetria față de o dreaptă; axa de simetrie", "Congruent figures; line symmetry; axis of symmetry"),
+            ("Clasificări de unghiuri: drept, ascuțit, obtuz, nul, alungit", "Angle classification"),
+            ("Calcule cu măsuri de unghiuri în grade și minute sexagesimale", "Calculations with angle measures"),
+            ("Figuri congruente; simetria față de o dreaptă; axa de simetrie", "Congruent figures; line symmetry"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 45, "exercise_count": 12},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 45},
     },
     {
         "order": 8,
@@ -123,17 +124,17 @@ GRADE_5_CURRICULUM = [
         "description": "Units of Measurement — length, area, volume; conversions and applications.",
         "lessons": [
             ("Unități de măsură pentru lungime; transformări; calcul de perimetre", "Length units; conversions; perimeter calculations"),
-            ("Unități de măsură pentru arie; aria pătratului și dreptunghiului; transformări", "Area units; square and rectangle area; conversions"),
-            ("Unități de măsură pentru volum; volumul cubului și paralelipipedului dreptunghic; transformări", "Volume units; cube and rectangular parallelepiped volume; conversions"),
+            ("Unități de măsură pentru arie; aria pătratului și dreptunghiului", "Area units; square and rectangle area"),
+            ("Unități de măsură pentru volum; volumul cubului și paralelipipedului", "Volume units; cube and rectangular parallelepiped volume"),
             ("Aplicații complexe cu unități de măsură", "Complex applications with units of measurement"),
         ],
-        "test": {"pass_threshold": 70, "time_limit_minutes": 45, "exercise_count": 12},
+        "test": {"pass_threshold": 70, "time_limit_minutes": 45},
     },
 ]
 
 
 class Command(BaseCommand):
-    help = "Seeds the Grade 5 curriculum structure (8 units, ~33 lessons, 8 tests)"
+    help = "Seeds the Grade 5 curriculum structure (8 units, 15 topics/lessons for Unit 1, 8 unit tests)"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -147,7 +148,6 @@ class Command(BaseCommand):
             self.stdout.write("Flushing existing Grade 5 data...")
             Grade.objects.filter(number=5).delete()
 
-        # Create or get Grade 5
         grade, created = Grade.objects.get_or_create(
             number=5,
             defaults={"name": "Clasa a V-a", "is_active": True},
@@ -157,6 +157,7 @@ class Command(BaseCommand):
             grade.is_active = True
             grade.save()
 
+        total_topics = 0
         total_lessons = 0
         total_tests = 0
 
@@ -173,39 +174,49 @@ class Command(BaseCommand):
             action = "Created" if u_created else "Found"
             self.stdout.write(f"  {action} Unit {unit_data['order']}: {unit_data['title']}")
 
-            # Create lessons
+            # Create one Topic + Lesson per curriculum entry (1-to-1 initially)
             for idx, (title_ro, summary_en) in enumerate(unit_data["lessons"], start=1):
-                lesson, l_created = Lesson.objects.get_or_create(
+                topic, t_created = Topic.objects.get_or_create(
                     unit=unit,
                     order=idx,
                     defaults={
                         "title": title_ro,
-                        "summary": summary_en,
-                        "content": f"# {title_ro}\n\nConținut în curs de elaborare.",
-                        "is_published": False,  # Not published until content is written
+                        "is_published": False,
                         "practice_minimum": 5,
+                    },
+                )
+                if t_created:
+                    total_topics += 1
+
+                lesson, l_created = Lesson.objects.get_or_create(
+                    topic=topic,
+                    order=1,
+                    defaults={
+                        "title": title_ro,
+                        "summary": summary_en,
+                        "is_published": False,
                     },
                 )
                 if l_created:
                     total_lessons += 1
 
-            # Create test
+            # Create unit-level test
             test_config = unit_data["test"]
-            test, t_created = Test.objects.get_or_create(
+            test, test_created = Test.objects.get_or_create(
                 unit=unit,
                 defaults={
+                    "scope": Test.Scope.UNIT,
                     "pass_threshold": test_config["pass_threshold"],
                     "time_limit_minutes": test_config["time_limit_minutes"],
-                    "exercise_count": test_config["exercise_count"],
                     "is_published": False,
                 },
             )
-            if t_created:
+            if test_created:
                 total_tests += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"\nDone! Created {total_lessons} lessons and {total_tests} tests "
-                f"across {len(GRADE_5_CURRICULUM)} units for Grade 5."
+                f"\nDone! Created {total_topics} topics, {total_lessons} lessons, "
+                f"and {total_tests} unit tests across {len(GRADE_5_CURRICULUM)} units for Grade 5."
             )
         )

@@ -14,14 +14,14 @@ import api from "@/api/client";
 import ExerciseCard from "@/components/exercise/ExerciseCard";
 import type { ExerciseInstance, Difficulty } from "@/types/progress";
 
-interface PreviewResponse {
-  instance: ExerciseInstance;
-  exercise_id: number;
-  lesson_title: string;
-  exercise_type: string;
-  difficulty: string;
-  category: string;
-}
+  interface PreviewResponse {
+    instance: ExerciseInstance;
+    exercise_id: number;
+    topic_title: string;
+    exercise_type: string;
+    difficulty: string;
+    category: string;
+  }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: "Ușor",
@@ -49,7 +49,7 @@ export default function AdminPreviewPage() {
         setInstance(res.data.instance);
         setMeta({
           exercise_id: res.data.exercise_id,
-          lesson_title: res.data.lesson_title,
+          topic_title: res.data.topic_title,
           exercise_type: res.data.exercise_type,
           difficulty: res.data.difficulty,
           category: res.data.category,
@@ -140,7 +140,7 @@ export default function AdminPreviewPage() {
       <main className="max-w-2xl mx-auto px-4 py-8">
         {/* Exercise metadata */}
         <div className="mb-4">
-          <p className="text-xs text-gray-400 mb-1">{meta.lesson_title}</p>
+          <p className="text-xs text-gray-400 mb-1">{meta.topic_title}</p>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-mono px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
               #{meta.exercise_id}

@@ -2,24 +2,25 @@
 Progress API views for MathEd Romania.
 
 Endpoints:
-  POST /api/v1/progress/lessons/<id>/open/       — mark lesson in_progress
-  POST /api/v1/progress/lessons/<id>/complete/   — mark lesson completed
-  GET  /api/v1/progress/lessons/<id>/practice/   — get randomized exercise set
-  GET  /api/v1/progress/lessons/<id>/categories/ — category list with tier states
-  POST /api/v1/progress/exercises/attempt/       — submit & grade an attempt
-  GET  /api/v1/progress/dashboard/               — student dashboard stats
+  POST /api/v1/progress/lessons/<id>/open/          — mark lesson in_progress
+  POST /api/v1/progress/lessons/<id>/complete/      — mark lesson completed
+  GET  /api/v1/progress/topics/<id>/practice/       — get randomized exercise set
+  GET  /api/v1/progress/topics/<id>/categories/     — category list with tier states
+  POST /api/v1/progress/exercises/attempt/          — submit & grade an attempt
+  GET  /api/v1/progress/exercises-overview/         — all topics with exercises
+  GET  /api/v1/progress/tests-overview/             — all topic tests
+  GET  /api/v1/progress/dashboard/                  — student dashboard stats
 """
 import uuid
 from collections import defaultdict
 
-from django.core import signing
 from django.db.models import Case, Count, IntegerField, When
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.content.models import Exercise, Lesson
+from apps.content.models import Exercise, Lesson, Topic, Test
 from apps.progress.exercise_engine import decode_instance_token, generate_instance
 from apps.progress.grading import grade_attempt
 from apps.progress.models import (
@@ -38,10 +39,8 @@ class LessonOpenView(APIView):
     POST /api/v1/progress/lessons/<lesson_id>/open/
 
     Called when a student opens a lesson. Creates or updates a
-    LessonProgress row with status=in_progress.
-    Idempotent — calling it twice on a completed lesson does nothing.
+    LessonProgress row with status=in_progress. Idempotent.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, lesson_id):
@@ -56,15 +55,11 @@ class LessonOpenView(APIView):
             defaults={"status": LessonProgress.Status.IN_PROGRESS},
         )
 
-        # Don't downgrade a completed lesson back to in_progress
         if not created and progress.status == LessonProgress.Status.NOT_STARTED:
             progress.status = LessonProgress.Status.IN_PROGRESS
             progress.save(update_fields=["status"])
 
-        return Response({
-            "lesson_id": lesson_id,
-            "status": progress.status,
-        })
+        return Response({"lesson_id": lesson_id, "status": progress.status})
 
 
 # ─── Lesson complete ──────────────────────────────────────────────────────────
@@ -73,13 +68,9 @@ class LessonCompleteView(APIView):
     """
     POST /api/v1/progress/lessons/<lesson_id>/complete/
 
-    Body (optional):
-      { "time_spent_seconds": 240 }
-
-    Marks the lesson as completed. Only succeeds if the student has met
-    the practice minimum for this lesson.
+    Marks a lesson as completed. No practice minimum check here —
+    that gate is at the topic level (test unlock).
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, lesson_id):
@@ -87,27 +78,6 @@ class LessonCompleteView(APIView):
             lesson = Lesson.objects.get(id=lesson_id, is_published=True)
         except Lesson.DoesNotExist:
             return Response({"error": "Lecția nu există."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Count distinct exercises answered correctly for this lesson
-        correct_count = ExerciseAttempt.objects.filter(
-            student=request.user,
-            exercise__lesson=lesson,
-            is_correct=True,
-        ).values("exercise_id").distinct().count()
-
-        if correct_count < lesson.practice_minimum:
-            return Response(
-                {
-                    "error": "practice_minimum_not_met",
-                    "message": (
-                        f"Trebuie să rezolvi corect cel puțin "
-                        f"{lesson.practice_minimum} exerciții înainte de a finaliza lecția."
-                    ),
-                    "correct_count": correct_count,
-                    "required": lesson.practice_minimum,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         time_spent = request.data.get("time_spent_seconds", 0)
 
@@ -128,229 +98,88 @@ class LessonCompleteView(APIView):
         })
 
 
-# ─── Practice session ─────────────────────────────────────────────────────────
+# ─── Topic practice session ───────────────────────────────────────────────────
 
-class LessonPracticeView(APIView):
+class TopicPracticeView(APIView):
     """
-    GET /api/v1/progress/lessons/<lesson_id>/practice/
+    GET /api/v1/progress/topics/<topic_id>/practice/
         ?count=5
-        &category=expanded_form   (optional — empty string = uncategorized)
-        &difficulty=easy          (optional — easy | medium | hard)
+        &category=expanded_form   (optional)
+        &difficulty=easy          (optional)
 
     Returns a randomized batch of exercise instances for practice.
-    A fresh session_id UUID is generated for each request; the frontend
-    must include it in every subsequent attempt submission so the backend
-    can detect perfect batches.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, lesson_id):
+    def get(self, request, topic_id):
         try:
-            lesson = Lesson.objects.prefetch_related("exercises").get(
-                id=lesson_id, is_published=True
+            topic = Topic.objects.prefetch_related("exercises").get(
+                id=topic_id, is_published=True
             )
-        except Lesson.DoesNotExist:
-            return Response({"error": "Lecția nu există."}, status=status.HTTP_404_NOT_FOUND)
+        except Topic.DoesNotExist:
+            return Response({"error": "Tema nu există."}, status=status.HTTP_404_NOT_FOUND)
 
+        count = int(request.query_params.get("count", 5))
         category = request.query_params.get("category", None)
         difficulty = request.query_params.get("difficulty", None)
 
-        qs = lesson.exercises.filter(is_active=True)
+        exercises = topic.exercises.filter(is_active=True)
         if category is not None:
-            qs = qs.filter(category=category)
-        if difficulty is not None:
-            qs = qs.filter(difficulty=difficulty)
+            exercises = exercises.filter(category=category)
+        if difficulty:
+            exercises = exercises.filter(difficulty=difficulty)
 
-        exercises = list(qs)
+        exercises = list(exercises)
+
         if not exercises:
             return Response(
-                {"error": "Această lecție nu are exerciții active pentru filtrele selectate."},
+                {"error": "Nu există exerciții disponibile pentru acest filtru."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        try:
-            count = min(int(request.query_params.get("count", 5)), 20)
-        except (ValueError, TypeError):
-            count = 5
-
         import random
-        selected = random.sample(exercises, count) if len(exercises) >= count else random.choices(exercises, k=count)
+        if len(exercises) <= count:
+            selected = exercises * (count // len(exercises) + 1)
+            selected = selected[:count]
+        else:
+            selected = random.sample(exercises, count)
 
-        instances = []
-        for exercise in selected:
-            try:
-                instances.append(generate_instance(exercise))
-            except Exception:
-                continue
-
-        # One session_id per batch — ties all 5 attempts together for
-        # perfect-batch detection in ExerciseAttemptView.
         session_id = str(uuid.uuid4())
 
+        instances = []
+        for ex in selected:
+            try:
+                instance = generate_instance(ex)
+                instance["exercise_id"] = ex.id
+                instances.append(instance)
+            except Exception as e:
+                continue
+
         return Response({
-            "lesson_id": lesson_id,
+            "topic_id": topic_id,
             "session_id": session_id,
             "exercises": instances,
-            "practice_minimum": lesson.practice_minimum,
+            "practice_minimum": topic.practice_minimum,
         })
 
 
-# ─── Attempt submission ───────────────────────────────────────────────────────
+# ─── Topic categories ─────────────────────────────────────────────────────────
 
-class ExerciseAttemptView(APIView):
+class TopicCategoriesView(APIView):
     """
-    POST /api/v1/progress/exercises/attempt/
+    GET /api/v1/progress/topics/<topic_id>/categories/
 
-    Body:
-      {
-        "exercise_id":    42,
-        "instance_token": "<signed token>",
-        "answer":         "936",
-        "session_id":     "uuid-string"   // from /practice/ response
-      }
-
-    Response:
-      {
-        "is_correct":       true,
-        "correct_answer":   null,         // non-null only when wrong
-        "tier_cleared":     "easy",       // non-null when a tier was just completed
-        "error":            null
-      }
-
-    After persisting, checks whether this session is now a perfect batch
-    (all 5 attempts correct) and updates CategoryProgress accordingly.
+    Returns all exercise categories for a topic with tier states.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request):
-        serializer = AttemptSubmitSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        data = serializer.validated_data
-        exercise_id = data["exercise_id"]
-        instance_token = data["instance_token"]
-        student_answer = data["answer"]
-        session_id = data.get("session_id")
-
+    def get(self, request, topic_id):
         try:
-            exercise = Exercise.objects.select_related("lesson").get(id=exercise_id, is_active=True)
-        except Exercise.DoesNotExist:
-            return Response({"error": "Exercițiul nu există."}, status=status.HTTP_404_NOT_FOUND)
+            topic = Topic.objects.get(id=topic_id, is_published=True)
+        except Topic.DoesNotExist:
+            return Response({"error": "Tema nu există."}, status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            token_data = decode_instance_token(instance_token)
-        except signing.BadSignature:
-            return Response(
-                {"error": "Token invalid sau expirat. Reîncarcă exercițiul."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if token_data["exercise_id"] != exercise_id:
-            return Response(
-                {"error": "Token nepotrivit cu exercițiul."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        exercise_type = token_data["exercise_type"]
-        grading_data = token_data["grading_data"]
-        is_correct, error_msg = grade_attempt(exercise_type, student_answer, grading_data)
-
-        is_preview = request.query_params.get("preview") == "true"
-
-        if not is_preview:
-            ExerciseAttempt.objects.create(
-                student=request.user,
-                exercise=exercise,
-                answer={"raw": student_answer},
-                is_correct=is_correct,
-                session_id=session_id,
-            )
-
-        # ── Perfect batch detection ────────────────────────────────────────
-        tier_cleared = None
-        if not is_preview and session_id:
-            tier_cleared = self._check_and_update_tier(request.user, exercise, session_id)
-
-        correct_answer_display = _build_correct_display(exercise_type, grading_data)
-
-        return Response({
-            "is_correct": is_correct,
-            "correct_answer": correct_answer_display if not is_correct else None,
-            "tier_cleared": tier_cleared,
-            "error": error_msg,
-        })
-
-    @staticmethod
-    def _check_and_update_tier(user, exercise, session_id) -> str | None:
-        """
-        After each attempt, check whether the batch is complete (5 attempts)
-        and perfect (all correct). If so, mark the appropriate difficulty tier
-        on CategoryProgress and return the tier name; else return None.
-        """
-        batch = ExerciseAttempt.objects.filter(student=user, session_id=session_id)
-        batch_count = batch.count()
-
-        if batch_count != 5:
-            return None
-
-        if batch.filter(is_correct=False).exists():
-            return None  # Not a perfect batch
-
-        difficulty = exercise.difficulty   # all exercises in a filtered batch share difficulty
-        category = exercise.category
-        lesson = exercise.lesson
-
-        cp, _ = CategoryProgress.objects.get_or_create(
-            student=user,
-            lesson=lesson,
-            category=category,
-        )
-
-        if difficulty == "easy" and not cp.easy_cleared:
-            cp.easy_cleared = True
-            cp.save(update_fields=["easy_cleared"])
-            return "easy"
-        elif difficulty == "medium" and not cp.medium_cleared:
-            cp.medium_cleared = True
-            cp.save(update_fields=["medium_cleared"])
-            return "medium"
-        elif difficulty == "hard" and not cp.hard_cleared:
-            # Hard also satisfies medium completion (New Game+ logic)
-            cp.hard_cleared = True
-            if not cp.medium_cleared:
-                cp.medium_cleared = True
-                cp.save(update_fields=["hard_cleared", "medium_cleared"])
-            else:
-                cp.save(update_fields=["hard_cleared"])
-            return "hard"
-
-        return None  # Tier was already cleared — still a perfect batch, just no new unlock
-
-
-# ─── Category list with tier states ──────────────────────────────────────────
-
-class LessonCategoriesView(APIView):
-    """
-    GET /api/v1/progress/lessons/<lesson_id>/categories/
-
-    Returns all exercise categories for a lesson with:
-      - exercises_attempted: total attempt count for the category
-      - perfect_batches:     number of 5/5 sessions the student has achieved
-      - tiers:               available/cleared state for easy/medium/hard
-    """
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, lesson_id):
-        try:
-            lesson = Lesson.objects.get(id=lesson_id, is_published=True)
-        except Lesson.DoesNotExist:
-            return Response({"error": "Lecția nu există."}, status=status.HTTP_404_NOT_FOUND)
-
-        exercises = Exercise.objects.filter(lesson=lesson, is_active=True)
+        exercises = Exercise.objects.filter(topic=topic, is_active=True)
 
         # Group exercise IDs by category
         category_map: dict[str, list[int]] = {}
@@ -360,21 +189,20 @@ class LessonCategoriesView(APIView):
 
         if not category_map:
             return Response({
-                "lesson_id": lesson_id,
-                "lesson_title": lesson.title,
+                "topic_id": topic_id,
+                "topic_title": topic.title,
                 "categories": [],
             })
 
-        # ── Attempt counts per category ────────────────────────────────────
+        # Attempt counts per category
         cat_total: dict[str, int] = defaultdict(int)
         for attempt in ExerciseAttempt.objects.filter(
             student=request.user,
-            exercise__lesson=lesson,
+            exercise__topic=topic,
         ).values("exercise__category"):
             cat_total[attempt["exercise__category"] or ""] += 1
 
-        # ── Perfect batch counts per category ──────────────────────────────
-        # A perfect batch = a session_id group where count=5 and all correct.
+        # Perfect batch counts per category
         cat_perfect: dict[str, int] = defaultdict(int)
         for cat, ex_ids in category_map.items():
             cat_perfect[cat] = (
@@ -389,13 +217,12 @@ class LessonCategoriesView(APIView):
                 .count()
             )
 
-        # ── CategoryProgress tier states ───────────────────────────────────
+        # CategoryProgress tier states
         cp_map: dict[str, CategoryProgress] = {
             cp.category: cp
-            for cp in CategoryProgress.objects.filter(student=request.user, lesson=lesson)
+            for cp in CategoryProgress.objects.filter(student=request.user, topic=topic)
         }
 
-        # ── Build response ─────────────────────────────────────────────────
         categories = []
         for cat, ex_ids in category_map.items():
             label = cat if cat else "Toate exercițiile"
@@ -412,19 +239,283 @@ class LessonCategoriesView(APIView):
                 "exercises_attempted": cat_total[cat],
                 "perfect_batches": cat_perfect[cat],
                 "tiers": {
-                    "easy":   {"available": True,         "cleared": easy_cleared},
-                    "medium": {"available": easy_cleared, "cleared": medium_cleared},
-                    "hard":   {"available": easy_cleared, "cleared": hard_cleared},
+                    "easy":   {"available": True,          "cleared": easy_cleared},
+                    "medium": {"available": easy_cleared,  "cleared": medium_cleared},
+                    "hard":   {"available": easy_cleared,  "cleared": hard_cleared},
                 },
             })
 
-        # Uncategorized last, then alphabetical
         categories.sort(key=lambda c: ("zzz" if not c["category"] else "", c["label"]))
 
         return Response({
-            "lesson_id": lesson_id,
-            "lesson_title": lesson.title,
+            "topic_id": topic_id,
+            "topic_title": topic.title,
             "categories": categories,
+        })
+
+
+# ─── Exercise attempt ─────────────────────────────────────────────────────────
+
+class ExerciseAttemptView(APIView):
+    """
+    POST /api/v1/progress/exercises/attempt/
+
+    Grades a single exercise attempt and records it.
+    Checks for perfect batch tier unlocks.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = AttemptSubmitSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        exercise_id = data["exercise_id"]
+        instance_token = data["instance_token"]
+        answer = data["answer"]
+        session_id = data.get("session_id")
+        is_preview = request.query_params.get("preview") == "true"
+
+        try:
+            exercise = Exercise.objects.select_related("topic").get(id=exercise_id)
+        except Exercise.DoesNotExist:
+            return Response({"error": "Exercițiul nu există."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            grading_data = decode_instance_token(instance_token)
+        except Exception:
+            return Response({"error": "Token invalid."}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_correct, correct_answer = grade_attempt(
+            exercise.exercise_type,
+            grading_data,
+            answer,
+        )
+
+        if is_preview:
+            return Response({
+                "is_correct": is_correct,
+                "correct_answer": correct_answer,
+                "tier_cleared": None,
+                "error": None,
+            })
+
+        ExerciseAttempt.objects.create(
+            student=request.user,
+            exercise=exercise,
+            answer=answer,
+            is_correct=is_correct,
+            session_id=session_id,
+        )
+
+        tier_cleared = None
+        if session_id:
+            tier_cleared = self._check_tier_cleared(request.user, session_id, exercise)
+
+        return Response({
+            "is_correct": is_correct,
+            "correct_answer": correct_answer,
+            "tier_cleared": tier_cleared,
+            "error": None,
+        })
+
+    def _check_tier_cleared(self, user, session_id, exercise):
+        batch = ExerciseAttempt.objects.filter(student=user, session_id=session_id)
+        if batch.count() != 5:
+            return None
+        if batch.filter(is_correct=False).exists():
+            return None
+
+        difficulty = exercise.difficulty
+        category = exercise.category
+        topic = exercise.topic
+
+        cp, _ = CategoryProgress.objects.get_or_create(
+            student=user,
+            topic=topic,
+            category=category,
+        )
+
+        if difficulty == "easy" and not cp.easy_cleared:
+            cp.easy_cleared = True
+            cp.save(update_fields=["easy_cleared"])
+            return "easy"
+        elif difficulty == "medium" and not cp.medium_cleared:
+            cp.medium_cleared = True
+            cp.save(update_fields=["medium_cleared"])
+            return "medium"
+        elif difficulty == "hard" and not cp.hard_cleared:
+            cp.hard_cleared = True
+            if not cp.medium_cleared:
+                cp.medium_cleared = True
+                cp.save(update_fields=["hard_cleared", "medium_cleared"])
+            else:
+                cp.save(update_fields=["hard_cleared"])
+            return "hard"
+
+        return None
+
+
+# ─── Exercises overview ───────────────────────────────────────────────────────
+
+class ExercisesOverviewView(APIView):
+    """
+    GET /api/v1/progress/exercises-overview/
+
+    Returns all published topics that have at least one active exercise,
+    ordered by unit then topic, with per-topic aggregate progress.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        topics = (
+            Topic.objects
+            .filter(is_published=True, exercises__is_active=True)
+            .distinct()
+            .select_related("unit__grade")
+            .order_by("unit__order", "order")
+        )
+        topic_ids = [t.id for t in topics]
+
+        # Total distinct exercise categories per topic
+        cat_counts = (
+            Exercise.objects
+            .filter(topic_id__in=topic_ids, is_active=True)
+            .values("topic_id")
+            .annotate(total=Count("category", distinct=True))
+        )
+        cat_count_map = {row["topic_id"]: row["total"] for row in cat_counts}
+
+        # Completed categories (medium or hard cleared)
+        completed_by_topic: dict[int, int] = defaultdict(int)
+        for cp in CategoryProgress.objects.filter(student=user, topic_id__in=topic_ids):
+            if cp.medium_cleared or cp.hard_cleared:
+                completed_by_topic[cp.topic_id] += 1
+
+        # Exercises attempted per topic
+        attempt_count_map: dict[int, int] = {}
+        for row in (
+            ExerciseAttempt.objects
+            .filter(student=user, exercise__topic_id__in=topic_ids)
+            .values("exercise__topic_id")
+            .annotate(count=Count("id"))
+        ):
+            attempt_count_map[row["exercise__topic_id"]] = row["count"]
+
+        results = [
+            {
+                "topic_id": topic.id,
+                "topic_title": topic.title,
+                "unit_id": topic.unit_id,
+                "unit_title": topic.unit.title,
+                "unit_order": topic.unit.order,
+                "topic_order": topic.order,
+                "total_categories": cat_count_map.get(topic.id, 0),
+                "completed_categories": completed_by_topic.get(topic.id, 0),
+                "exercises_attempted": attempt_count_map.get(topic.id, 0),
+            }
+            for topic in topics
+        ]
+
+        return Response({"topics": results})
+
+
+# ─── Tests overview ───────────────────────────────────────────────────────────
+
+class TestsOverviewView(APIView):
+    """
+    GET /api/v1/progress/tests-overview/
+
+    Returns all published topic tests ordered by topic sequence,
+    with the authenticated student's best attempt status.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db import models as django_models
+
+        user = request.user
+
+        tests = (
+            Test.objects
+            .filter(scope=Test.Scope.TOPIC, is_published=True, topic__is_published=True)
+            .select_related("topic__unit__grade")
+            .order_by("topic__unit__order", "topic__order")
+        )
+        test_ids = [t.id for t in tests]
+
+        attempt_stats = (
+            TestAttempt.objects
+            .filter(
+                student=user,
+                test_id__in=test_ids,
+                status=TestAttempt.Status.COMPLETED,
+            )
+            .values("test_id")
+            .annotate(
+                attempts_count=Count("id"),
+                passed_count=Count("id", filter=django_models.Q(passed=True)),
+                best_score=django_models.Max("score"),
+            )
+        )
+        attempt_map = {row["test_id"]: row for row in attempt_stats}
+
+        results = []
+        for test in tests:
+            a = attempt_map.get(test.id)
+            results.append({
+                "test_id": test.id,
+                "topic_id": test.topic_id,
+                "topic_title": test.topic.title,
+                "unit_id": test.topic.unit_id,
+                "unit_title": test.topic.unit.title,
+                "unit_order": test.topic.unit.order,
+                "topic_order": test.topic.order,
+                "pass_threshold": test.pass_threshold,
+                "time_limit_minutes": test.time_limit_minutes,
+                "attempts_count": a["attempts_count"] if a else 0,
+                "passed": bool(a["passed_count"]) if a else None,
+                "best_score": float(a["best_score"]) if a and a["best_score"] is not None else None,
+            })
+
+        return Response({"tests": results})
+
+
+# ─── Exercise preview (admin) ─────────────────────────────────────────────────
+
+class ExercisePreviewInstanceView(APIView):
+    """
+    GET /api/v1/progress/exercises/<exercise_id>/preview-instance/
+
+    Generates and returns one random instance without recording any attempt.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, exercise_id):
+        try:
+            exercise = Exercise.objects.select_related("topic").get(id=exercise_id)
+        except Exercise.DoesNotExist:
+            return Response({"error": "Exercițiul nu există."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            instance = generate_instance(exercise)
+            instance["exercise_id"] = exercise.id
+        except Exception as e:
+            return Response(
+                {"error": f"Template invalid: {e}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            "instance": instance,
+            "exercise_id": exercise.id,
+            "topic_title": exercise.topic.title,
+            "exercise_type": exercise.exercise_type,
+            "difficulty": exercise.difficulty,
+            "category": exercise.category,
         })
 
 
@@ -434,30 +525,32 @@ class DashboardView(APIView):
     """
     GET /api/v1/progress/dashboard/
 
-    Returns aggregated stats for the authenticated student's dashboard:
-      - Lesson completion counts (overall + per-unit)
-      - exercises_attempted: total practice attempts ever
-      - perfect_batches:     total 5/5 sessions ever
+    Aggregated stats for the authenticated student.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         from apps.content.models import Unit
+        from django.db import models as django_models
 
         user = request.user
 
-        all_lessons = Lesson.objects.filter(is_published=True).select_related("unit__grade")
+        all_lessons = Lesson.objects.filter(is_published=True).select_related("topic__unit__grade")
         progress_map = {
             p.lesson_id: p.status
             for p in LessonProgress.objects.filter(student=user)
         }
 
         total_lessons = all_lessons.count()
-        completed = sum(1 for l in all_lessons if progress_map.get(l.id) == LessonProgress.Status.COMPLETED)
-        in_progress = sum(1 for l in all_lessons if progress_map.get(l.id) == LessonProgress.Status.IN_PROGRESS)
+        completed = sum(
+            1 for l in all_lessons
+            if progress_map.get(l.id) == LessonProgress.Status.COMPLETED
+        )
+        in_progress = sum(
+            1 for l in all_lessons
+            if progress_map.get(l.id) == LessonProgress.Status.IN_PROGRESS
+        )
 
-        # ── Exercise stats ─────────────────────────────────────────────────
         exercises_attempted = ExerciseAttempt.objects.filter(student=user).count()
 
         perfect_batches = (
@@ -472,19 +565,21 @@ class DashboardView(APIView):
             .count()
         )
 
-        # ── Per-unit breakdown ─────────────────────────────────────────────
-        units_data = []
-        for unit in (
-            Unit.objects.filter(is_published=True)
-            .prefetch_related("lessons", "grade")
-            .order_by("grade__number", "order")
-        ):
-            unit_lessons = [l for l in all_lessons if l.unit_id == unit.id]
+        units = Unit.objects.filter(is_published=True).prefetch_related(
+            "topics__lessons"
+        ).select_related("grade").order_by("grade", "order")
+
+        unit_data = []
+        for unit in units:
+            unit_lessons = [
+                l for topic in unit.topics.filter(is_published=True)
+                for l in topic.lessons.filter(is_published=True)
+            ]
             unit_completed = sum(
                 1 for l in unit_lessons
                 if progress_map.get(l.id) == LessonProgress.Status.COMPLETED
             )
-            units_data.append({
+            unit_data.append({
                 "unit_id": unit.id,
                 "unit_title": unit.title,
                 "grade_number": unit.grade.number,
@@ -498,24 +593,14 @@ class DashboardView(APIView):
             "in_progress_lessons": in_progress,
             "exercises_attempted": exercises_attempted,
             "perfect_batches": perfect_batches,
-            "units": units_data,
+            "units": unit_data,
         })
 
 
-# ─── Test session ─────────────────────────────────────────────────────────────
-
-from apps.content.models import Test
-from apps.progress.test_engine import build_test_session, calculate_score
-
+# ─── Test session views ───────────────────────────────────────────────────────
 
 class TestStartView(APIView):
-    """
-    POST /api/v1/progress/tests/<test_id>/start/
-
-    Creates a new TestAttempt and generates exercise instances.
-    If an in-progress attempt already exists, returns that instead
-    (student can resume).
-    """
+    """POST /api/v1/progress/tests/<test_id>/start/"""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, test_id):
@@ -524,146 +609,141 @@ class TestStartView(APIView):
         except Test.DoesNotExist:
             return Response({"error": "Testul nu există."}, status=status.HTTP_404_NOT_FOUND)
 
-        existing = TestAttempt.objects.filter(
+        # Reuse existing in-progress attempt if any
+        attempt = TestAttempt.objects.filter(
             student=request.user,
             test=test,
             status=TestAttempt.Status.IN_PROGRESS,
         ).first()
-        if existing:
-            return Response({
-                "attempt_id": existing.id,
-                "exercises": existing.exercise_instances,
-                "answers": existing.answers,
-                "resumed": True,
-            })
 
-        instances = build_test_session(test)
-        if not instances:
-            return Response(
-                {"error": "Testul nu are exerciții configurate."},
-                status=status.HTTP_400_BAD_REQUEST,
+        if not attempt:
+            # Generate exercises from composition
+            exercises_pool = Exercise.objects.filter(
+                topic=test.topic, is_active=True
+            ) if test.topic else Exercise.objects.filter(
+                topic__unit=test.unit, is_active=True
             )
 
-        attempt = TestAttempt.objects.create(
-            student=request.user,
-            test=test,
-            status=TestAttempt.Status.IN_PROGRESS,
-            exercise_instances=instances,
-            answers={},
-        )
+            instances = _build_test_instances(test.composition, exercises_pool)
+            attempt = TestAttempt.objects.create(
+                student=request.user,
+                test=test,
+                exercise_instances=instances,
+                status=TestAttempt.Status.IN_PROGRESS,
+            )
 
         return Response({
             "attempt_id": attempt.id,
-            "exercises": instances,
-            "answers": {},
-            "resumed": False,
-        })
-
-
-class TestAnswerView(APIView):
-    """
-    POST /api/v1/progress/tests/<test_id>/answer/
-
-    Body:
-      {
-        "attempt_id":     1,
-        "index":          0,
-        "instance_token": "...",
-        "answer":         "936"
-      }
-
-    Grades a single answer and stores it in the attempt.
-    Does not reveal correctness until test is finished.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, test_id):
-        attempt_id = request.data.get("attempt_id")
-        index = request.data.get("index")
-        instance_token = request.data.get("instance_token")
-        student_answer = request.data.get("answer")
-
-        if any(v is None for v in [attempt_id, index, instance_token, student_answer]):
-            return Response({"error": "Câmpuri lipsă."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            attempt = TestAttempt.objects.get(
-                id=attempt_id,
-                student=request.user,
-                status=TestAttempt.Status.IN_PROGRESS,
-            )
-        except TestAttempt.DoesNotExist:
-            return Response({"error": "Sesiune invalidă."}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            token_data = decode_instance_token(instance_token)
-        except signing.BadSignature:
-            return Response({"error": "Token invalid."}, status=status.HTTP_400_BAD_REQUEST)
-
-        exercise_type = token_data["exercise_type"]
-        grading_data = token_data["grading_data"]
-        is_correct, _ = grade_attempt(exercise_type, student_answer, grading_data)
-
-        instances = attempt.exercise_instances
-        weight = instances[int(index)].get("weight", 10) if int(index) < len(instances) else 10
-
-        answers = attempt.answers
-        answers[str(index)] = {
-            "answer": student_answer,
-            "is_correct": is_correct,
-            "exercise_id": token_data.get("exercise_id"),
-            "weight": weight,
-        }
-        attempt.answers = answers
-        attempt.save(update_fields=["answers"])
-
-        return Response({"received": True, "index": index})
-
-
-class TestFinishView(APIView):
-    """
-    POST /api/v1/progress/tests/<test_id>/finish/
-
-    Body: { "attempt_id": 1 }
-
-    Finalizes the attempt, calculates score, sets passed flag.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, test_id):
-        attempt_id = request.data.get("attempt_id")
-        try:
-            attempt = TestAttempt.objects.select_related("test").get(
-                id=attempt_id,
-                student=request.user,
-                status=TestAttempt.Status.IN_PROGRESS,
-            )
-        except TestAttempt.DoesNotExist:
-            return Response({"error": "Sesiune invalidă."}, status=status.HTTP_404_NOT_FOUND)
-
-        score, _ = calculate_score(attempt.test.composition, attempt.answers)
-        passed = score >= attempt.test.pass_threshold
-
-        attempt.score = score
-        attempt.passed = passed
-        attempt.status = TestAttempt.Status.COMPLETED
-        attempt.finished_at = timezone.now()
-        attempt.save(update_fields=["score", "passed", "status", "finished_at"])
-
-        return Response({
-            "score": score,
-            "passed": passed,
-            "pass_threshold": attempt.test.pass_threshold,
+            "exercises": attempt.exercise_instances,
             "answers": attempt.answers,
         })
 
 
-class TestResultView(APIView):
-    """
-    GET /api/v1/progress/tests/<test_id>/result/
+class TestAnswerView(APIView):
+    """POST /api/v1/progress/tests/<test_id>/answer/"""
+    permission_classes = [permissions.IsAuthenticated]
 
-    Returns the most recent completed attempt for this student.
-    """
+    def post(self, request, test_id):
+        attempt = TestAttempt.objects.filter(
+            student=request.user,
+            test_id=test_id,
+            status=TestAttempt.Status.IN_PROGRESS,
+        ).first()
+
+        if not attempt:
+            return Response({"error": "Nu există un test activ."}, status=status.HTTP_404_NOT_FOUND)
+
+        index = str(request.data.get("index"))
+        answer = request.data.get("answer")
+
+        answers = dict(attempt.answers)
+        answers[index] = {"answer": answer, "is_correct": None, "exercise_id": None}
+        attempt.answers = answers
+        attempt.save(update_fields=["answers"])
+
+        return Response({"saved": True})
+
+
+class TestFinishView(APIView):
+    """POST /api/v1/progress/tests/<test_id>/finish/"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, test_id):
+        attempt = TestAttempt.objects.filter(
+            student=request.user,
+            test_id=test_id,
+            status=TestAttempt.Status.IN_PROGRESS,
+        ).first()
+
+        if not attempt:
+            return Response({"error": "Nu există un test activ."}, status=status.HTTP_404_NOT_FOUND)
+
+        test = attempt.test
+        instances = attempt.exercise_instances
+        answers = dict(attempt.answers)
+
+        total_weight = 0
+        earned_weight = 0
+        graded_answers = {}
+
+        for idx, instance in enumerate(instances):
+            str_idx = str(idx)
+            exercise_id = instance.get("exercise_id")
+            instance_token = instance.get("instance_token")
+            weight = instance.get("weight", 1)
+            student_answer = answers.get(str_idx, {}).get("answer")
+
+            total_weight += weight
+
+            if student_answer is None or instance_token is None:
+                graded_answers[str_idx] = {
+                    "answer": None,
+                    "is_correct": False,
+                    "exercise_id": exercise_id,
+                }
+                continue
+
+            try:
+                exercise = Exercise.objects.get(id=exercise_id)
+                grading_data = decode_instance_token(instance_token)
+                is_correct, correct_answer = grade_attempt(
+                    exercise.exercise_type, grading_data, student_answer
+                )
+            except Exception:
+                is_correct = False
+                correct_answer = None
+
+            if is_correct:
+                earned_weight += weight
+
+            graded_answers[str_idx] = {
+                "answer": student_answer,
+                "is_correct": is_correct,
+                "correct_answer": correct_answer,
+                "exercise_id": exercise_id,
+            }
+
+        score = (earned_weight / total_weight * 100) if total_weight > 0 else 0
+        passed = score >= test.pass_threshold
+
+        attempt.answers = graded_answers
+        attempt.score = score
+        attempt.passed = passed
+        attempt.status = TestAttempt.Status.COMPLETED
+        attempt.finished_at = timezone.now()
+        attempt.save()
+
+        return Response({
+            "attempt_id": attempt.id,
+            "score": round(score, 2),
+            "passed": passed,
+            "pass_threshold": test.pass_threshold,
+            "answers": graded_answers,
+        })
+
+
+class TestResultView(APIView):
+    """GET /api/v1/progress/tests/<test_id>/result/"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, test_id):
@@ -674,42 +754,69 @@ class TestResultView(APIView):
         ).order_by("-finished_at").first()
 
         if not attempt:
-            return Response(
-                {"error": "Niciun test completat găsit."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"error": "Nu există rezultate."}, status=status.HTTP_404_NOT_FOUND)
 
         return Response({
-            "score": attempt.score,
+            "attempt_id": attempt.id,
+            "score": float(attempt.score),
             "passed": attempt.passed,
             "pass_threshold": attempt.test.pass_threshold,
-            "finished_at": attempt.finished_at,
             "answers": attempt.answers,
-            "exercise_instances": attempt.exercise_instances,
+            "finished_at": attempt.finished_at,
         })
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _build_correct_display(exercise_type: str, grading_data: dict) -> str:
-    """Build a human-readable correct-answer string to show after a wrong attempt."""
+def _build_test_instances(composition: list, exercises_pool) -> list:
+    """Build a list of exercise instances from a test composition spec."""
+    import random
+    instances = []
+
+    for slot in composition:
+        category = slot.get("category")
+        count = slot.get("count", 1)
+        difficulty = slot.get("difficulty")
+        weight = slot.get("weight", 1)
+
+        pool = exercises_pool.filter(category=category, is_active=True)
+        if difficulty:
+            pool = pool.filter(difficulty=difficulty)
+        pool = list(pool)
+
+        if not pool:
+            continue
+
+        selected = random.choices(pool, k=count)
+        for ex in selected:
+            try:
+                instance = generate_instance(ex)
+                instance["exercise_id"] = ex.id
+                instance["weight"] = weight
+                instances.append(instance)
+            except Exception:
+                continue
+
+    return instances
+
+
+def _correct_answer_display(exercise_type: str, grading_data: dict) -> str:
+    """Return a human-readable correct answer string."""
     if exercise_type == "multi_fill_blank":
         parts = [f"{k} = {v}" for k, v in grading_data.get("correct_map", {}).items()]
         return ", ".join(parts)
     elif exercise_type == "fill_blank":
-        # Set-membership grading
         if "valid_set" in grading_data:
             if grading_data.get("answer_display"):
                 return grading_data["answer_display"]
             valid = grading_data["valid_set"]
             return f"orice număr din intervalul [{min(valid)}, {max(valid)}]"
-        # Standard symbolic grading
         expr = grading_data.get("correct_expr", "")
         try:
             from apps.progress.grading import TRANSFORMATIONS, normalize
             from sympy.parsing.sympy_parser import parse_expr
             return str(parse_expr(normalize(expr), transformations=TRANSFORMATIONS))
-        except Exception:  # noqa: BLE001
+        except Exception:
             return expr
     elif exercise_type == "comparison":
         left = grading_data.get("left_expr", "")
@@ -717,14 +824,11 @@ def _build_correct_display(exercise_type: str, grading_data: dict) -> str:
         try:
             import sympy
             from sympy.parsing.sympy_parser import (
-                convert_xor,
-                implicit_multiplication_application,
-                parse_expr,
-                standard_transformations,
+                convert_xor, implicit_multiplication_application,
+                parse_expr, standard_transformations,
             )
             transforms = standard_transformations + (
-                implicit_multiplication_application,
-                convert_xor,
+                implicit_multiplication_application, convert_xor,
             )
             l_val = parse_expr(left.replace(":", "/"), transformations=transforms)
             r_val = parse_expr(right.replace(":", "/"), transformations=transforms)
@@ -732,180 +836,10 @@ def _build_correct_display(exercise_type: str, grading_data: dict) -> str:
             if diff == sympy.Integer(0):
                 return "="
             return ">" if diff > 0 else "<"
-        except Exception:  # noqa: BLE001
+        except Exception:
             return "?"
     elif exercise_type == "multiple_choice":
         return str(grading_data.get("correct_option_id", ""))
     elif exercise_type == "drag_order":
         return ", ".join(str(x) for x in grading_data.get("correct_order", []))
     return ""
-
-
-# ─── Exercises overview ───────────────────────────────────────────────────────
-
-class ExercisesOverviewView(APIView):
-    """
-    GET /api/v1/progress/exercises-overview/
-
-    Returns all published lessons that have at least one active exercise,
-    ordered by unit then lesson, with per-lesson aggregate progress for
-    the authenticated student.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        from collections import defaultdict
-        from django.db.models import Count, Q
-
-        user = request.user
-
-        # All published lessons with at least one active exercise
-        lessons = (
-            Lesson.objects
-            .filter(is_published=True, exercises__is_active=True)
-            .distinct()
-            .select_related("unit__grade")
-            .order_by("unit__order", "order")
-        )
-        lesson_ids = [l.id for l in lessons]
-
-        # Total distinct exercise categories per lesson
-        cat_counts = (
-            Exercise.objects
-            .filter(lesson_id__in=lesson_ids, is_active=True)
-            .values("lesson_id")
-            .annotate(total=Count("category", distinct=True))
-        )
-        cat_count_map = {row["lesson_id"]: row["total"] for row in cat_counts}
-
-        # Student's CategoryProgress — completed = medium_cleared OR hard_cleared
-        completed_by_lesson: dict[int, int] = defaultdict(int)
-        for cp in CategoryProgress.objects.filter(student=user, lesson_id__in=lesson_ids):
-            if cp.medium_cleared or cp.hard_cleared:
-                completed_by_lesson[cp.lesson_id] += 1
-
-        # Exercises attempted per lesson
-        attempt_count_map: dict[int, int] = {}
-        for row in (
-            ExerciseAttempt.objects
-            .filter(student=user, exercise__lesson_id__in=lesson_ids)
-            .values("exercise__lesson_id")
-            .annotate(count=Count("id"))
-        ):
-            attempt_count_map[row["exercise__lesson_id"]] = row["count"]
-
-        results = [
-            {
-                "lesson_id": lesson.id,
-                "lesson_title": lesson.title,
-                "unit_id": lesson.unit_id,
-                "unit_title": lesson.unit.title,
-                "unit_order": lesson.unit.order,
-                "lesson_order": lesson.order,
-                "total_categories": cat_count_map.get(lesson.id, 0),
-                "completed_categories": completed_by_lesson.get(lesson.id, 0),
-                "exercises_attempted": attempt_count_map.get(lesson.id, 0),
-            }
-            for lesson in lessons
-        ]
-
-        return Response({"lessons": results})
-
-
-# ─── Tests overview ───────────────────────────────────────────────────────────
-
-class TestsOverviewView(APIView):
-    """
-    GET /api/v1/progress/tests-overview/
-
-    Returns all published lesson tests (scope=lesson) ordered by lesson
-    sequence, with the authenticated student's best attempt status.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        from django.db.models import Count, Max, Q
-
-        user = request.user
-
-        tests = (
-            Test.objects
-            .filter(scope=Test.Scope.LESSON, is_published=True, lesson__is_published=True)
-            .select_related("lesson__unit__grade")
-            .order_by("lesson__unit__order", "lesson__order")
-        )
-        test_ids = [t.id for t in tests]
-
-        # Best attempt per test: passed (any) → score → most recent
-        attempt_stats = (
-            TestAttempt.objects
-            .filter(
-                student=user,
-                test_id__in=test_ids,
-                status=TestAttempt.Status.COMPLETED,
-            )
-            .values("test_id")
-            .annotate(
-                attempts_count=Count("id"),
-                passed_count=Count("id", filter=models.Q(passed=True)),
-                best_score=models.Max("score"),
-            )
-        )
-        attempt_map = {row["test_id"]: row for row in attempt_stats}
-
-        results = []
-        for test in tests:
-            a = attempt_map.get(test.id)
-            results.append({
-                "test_id": test.id,
-                "lesson_id": test.lesson_id,
-                "lesson_title": test.lesson.title,
-                "unit_id": test.lesson.unit_id,
-                "unit_title": test.lesson.unit.title,
-                "unit_order": test.lesson.unit.order,
-                "lesson_order": test.lesson.order,
-                "pass_threshold": test.pass_threshold,
-                "time_limit_minutes": test.time_limit_minutes,
-                "attempts_count": a["attempts_count"] if a else 0,
-                "passed": bool(a["passed_count"]) if a else None,
-                "best_score": float(a["best_score"]) if a and a["best_score"] is not None else None,
-            })
-
-        return Response({"tests": results})
-
-# ─── Admin exercise preview instance ─────────────────────────────────────────
-
-class ExercisePreviewInstanceView(APIView):
-    """
-    GET /api/v1/progress/exercises/<exercise_id>/preview-instance/
-
-    Admin-only. Generates and returns one random instance from the
-    exercise template — same format as the practice endpoint, so the
-    frontend can render it with the exact same ExerciseCard component.
-
-    Does NOT record any attempt or session data.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, exercise_id):
-        try:
-            exercise = Exercise.objects.select_related("lesson").get(id=exercise_id)
-        except Exercise.DoesNotExist:
-            return Response({"error": "Exercițiul nu există."}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            instance = generate_instance(exercise)
-        except Exception as exc:
-            return Response(
-                {"error": str(exc)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return Response({
-            "instance": instance,
-            "exercise_id": exercise.id,
-            "lesson_title": exercise.lesson.title,
-            "exercise_type": exercise.exercise_type,
-            "difficulty": exercise.difficulty,
-            "category": exercise.category or "",
-        })

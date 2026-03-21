@@ -4,28 +4,28 @@ from .views import (
     DashboardView,
     ExerciseAttemptView,
     ExercisesOverviewView,
+    ExercisePreviewInstanceView,
     LessonCompleteView,
     LessonOpenView,
-    LessonPracticeView,
     TestsOverviewView,
     TestStartView,
     TestAnswerView,
     TestFinishView,
     TestResultView,
-    LessonCategoriesView,
-    ExercisePreviewInstanceView,
+    TopicCategoriesView,
+    TopicPracticeView,
 )
 
 urlpatterns = [
-    # Lesson progress
+    # Lesson progress (content reading — still per-lesson)
     path("lessons/<int:lesson_id>/open/", LessonOpenView.as_view(), name="lesson_open"),
     path("lessons/<int:lesson_id>/complete/", LessonCompleteView.as_view(), name="lesson_complete"),
-    path("lessons/<int:lesson_id>/categories/", LessonCategoriesView.as_view(), name="lesson_categories"),
 
-    # Practice
-    path("lessons/<int:lesson_id>/practice/", LessonPracticeView.as_view(), name="lesson_practice"),
+    # Topic practice & categories
+    path("topics/<int:topic_id>/practice/", TopicPracticeView.as_view(), name="topic_practice"),
+    path("topics/<int:topic_id>/categories/", TopicCategoriesView.as_view(), name="topic_categories"),
 
-    # Attempt submission (practice)
+    # Exercise attempt submission
     path("exercises/attempt/", ExerciseAttemptView.as_view(), name="exercise_attempt"),
     path("exercises/<int:exercise_id>/preview-instance/", ExercisePreviewInstanceView.as_view(), name="exercise_preview_instance"),
 

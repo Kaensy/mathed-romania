@@ -17,9 +17,8 @@ class ExerciseAttemptAdmin(admin.ModelAdmin):
 
 @admin.register(CategoryProgress)
 class CategoryProgressAdmin(admin.ModelAdmin):
-    list_display = ("student", "lesson", "category", "easy_cleared", "medium_cleared", "hard_cleared")
-    list_filter = ("easy_cleared", "medium_cleared", "hard_cleared")
-    search_fields = ("student__email", "lesson__title", "category")
+    list_display = ("student", "topic", "category", "easy_cleared", "medium_cleared", "hard_cleared")
+    list_filter = ("topic", "easy_cleared", "medium_cleared", "hard_cleared")
 
 
 @admin.register(TestAttempt)

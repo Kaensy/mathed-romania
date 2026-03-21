@@ -1,18 +1,17 @@
 """
 Content models for MathEd Romania.
 
-Hierarchy: Grade → Unit → Lesson → Exercise
-Each unit has one Test that gates progression to the next unit.
+Hierarchy: Grade → Unit → Topic → Lesson
+Each Topic groups one or more Lessons, and owns Exercises and a Test.
+Lessons are purely content (blocks); progression gates live at the Topic level.
 """
 from django.db import models
 
 
 class Grade(models.Model):
-    """
-    Top-level grouping (5, 6, 7, 8).
-    """
+    """Top-level grouping (5, 6, 7, 8)."""
     number = models.PositiveSmallIntegerField(unique=True)
-    name = models.CharField(max_length=100)  # e.g. "Clasa a V-a"
+    name = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -28,9 +27,7 @@ class Grade(models.Model):
 
 
 class Unit(models.Model):
-    """
-    Chapter/unit within a grade. Sequential unlock between units.
-    """
+    """Chapter/unit within a grade. Sequential unlock between units."""
     grade = models.ForeignKey(Grade, on_delete=models.CASCADE, related_name="units")
     order = models.PositiveSmallIntegerField()
     title = models.CharField(max_length=200)
@@ -51,17 +48,55 @@ class Unit(models.Model):
         return f"{self.grade.number}.{self.order} — {self.title}"
 
     @property
+    def published_topics(self):
+        return self.topics.filter(is_published=True)
+
+
+class Topic(models.Model):
+    """
+    A math topic within a unit. Groups one or more Lessons.
+    Owns all Exercises, one Test, and progression state.
+
+    Single-lesson topics: one Lesson, standard flow.
+    Multi-lesson topics: e.g. "Adunarea" spans two Lessons (calcul + Gauss);
+      both lessons are read before practicing/testing at the topic level.
+    """
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="topics")
+    order = models.PositiveSmallIntegerField()
+    title = models.CharField(
+        max_length=200,
+        help_text="Displayed on the Exerciții and Teste overview pages",
+    )
+    description = models.TextField(blank=True)
+    is_published = models.BooleanField(default=False)
+    practice_minimum = models.PositiveSmallIntegerField(
+        default=5,
+        help_text="Minimum exercises a student must complete before the test unlocks",
+    )
+
+    class Meta:
+        db_table = "topics"
+        ordering = ["unit", "order"]
+        unique_together = [("unit", "order")]
+
+    def __str__(self):
+        return f"{self.unit.grade.number}.{self.unit.order}.{self.order} — {self.title}"
+
+    @property
     def published_lessons(self):
-        return self.lessons.filter(is_published=True)
+        return self.lessons.filter(is_published=True).order_by("order")
+
+    @property
+    def active_exercises(self):
+        return self.exercises.filter(is_active=True)
 
 
 class Lesson(models.Model):
     """
-    Individual lesson within a unit.
+    Individual lesson (content only) within a topic.
     Content is stored as a structured JSON array of typed blocks.
-    See BLOCK_SCHEMA.md for the full block type specification.
     """
-    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="lessons")
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="lessons")
     order = models.PositiveSmallIntegerField()
     title = models.CharField(max_length=200)
     summary = models.TextField(
@@ -77,30 +112,22 @@ class Lesson(models.Model):
         ),
     )
     is_published = models.BooleanField(default=False)
-    practice_minimum = models.PositiveSmallIntegerField(
-        default=5,
-        help_text="Minimum exercises to complete before next lesson unlocks",
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "lessons"
-        ordering = ["unit", "order"]
-        unique_together = [("unit", "order")]
+        ordering = ["topic", "order"]
+        unique_together = [("topic", "order")]
 
     def __str__(self):
-        return f"{self.unit.grade.number}.{self.unit.order}.{self.order} — {self.title}"
-
-    @property
-    def active_exercises(self):
-        return self.exercises.filter(is_active=True)
+        unit = self.topic.unit
+        return f"{unit.grade.number}.{unit.order}.{self.topic.order}.{self.order} — {self.title}"
 
 
 class Exercise(models.Model):
     """
-    Exercise linked to a lesson. Template stored as JSONB for
-    parameter randomization.
+    Exercise linked to a topic. Template stored as JSONB for parameter randomization.
     """
     class ExerciseType(models.TextChoices):
         MULTIPLE_CHOICE = "multiple_choice", "Multiple Choice"
@@ -117,7 +144,7 @@ class Exercise(models.Model):
         MEDIUM = "medium", "Medium"
         HARD = "hard", "Hard"
 
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="exercises")
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="exercises")
     exercise_type = models.CharField(max_length=20, choices=ExerciseType.choices)
     difficulty = models.CharField(max_length=10, choices=Difficulty.choices, default=Difficulty.MEDIUM)
     category = models.CharField(
@@ -136,17 +163,17 @@ class Exercise(models.Model):
         db_table = "exercises"
 
     def __str__(self):
-        return f"Exercise ({self.exercise_type}) for {self.lesson.title}"
+        return f"Exercise ({self.exercise_type}) — {self.topic.title} [{self.category}]"
 
 
 class Test(models.Model):
     """
-    Evaluation test — either a lesson-level test or a unit-level test.
-    Lesson tests gate progression to the next lesson.
+    Evaluation test — either a topic-level test or a unit-level test.
+    Topic tests gate progression to the next topic.
     Unit tests gate progression to the next unit.
     """
     class Scope(models.TextChoices):
-        LESSON = "lesson", "Lesson Test"
+        TOPIC = "topic", "Topic Test"
         UNIT = "unit", "Unit Test"
 
     scope = models.CharField(
@@ -154,7 +181,6 @@ class Test(models.Model):
         choices=Scope.choices,
         default=Scope.UNIT,
     )
-    # Exactly one of these is set depending on scope
     unit = models.OneToOneField(
         Unit,
         on_delete=models.CASCADE,
@@ -162,8 +188,8 @@ class Test(models.Model):
         null=True,
         blank=True,
     )
-    lesson = models.OneToOneField(
-        "Lesson",
+    topic = models.OneToOneField(
+        Topic,
         on_delete=models.CASCADE,
         related_name="test",
         null=True,
@@ -197,26 +223,23 @@ class Test(models.Model):
         constraints = [
             models.CheckConstraint(
                 check=(
-                    models.Q(scope="lesson", lesson__isnull=False, unit__isnull=True) |
-                    models.Q(scope="unit", unit__isnull=False, lesson__isnull=True)
+                    models.Q(scope="topic", topic__isnull=False, unit__isnull=True) |
+                    models.Q(scope="unit", unit__isnull=False, topic__isnull=True)
                 ),
                 name="test_scope_consistency",
             )
         ]
 
     def __str__(self):
-        if self.scope == self.Scope.LESSON and self.lesson:
-            return f"Test (Lecție): {self.lesson.title}"
+        if self.scope == self.Scope.TOPIC and self.topic:
+            return f"Test (Topic): {self.topic.title}"
         if self.scope == self.Scope.UNIT and self.unit:
             return f"Test (Unitate): {self.unit.title}"
         return f"Test ({self.scope})"
 
 
 class GlossaryTerm(models.Model):
-    """
-    Mathematical term definitions, cross-referenced with content.
-    Searchable by students, available offline.
-    """
+    """Mathematical term definitions, cross-referenced with content."""
     term = models.CharField(max_length=200)
     definition = models.TextField()
     unit = models.ForeignKey(

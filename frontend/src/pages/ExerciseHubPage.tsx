@@ -1,260 +1,149 @@
-/**
- * ExerciseHubPage — shows all exercise categories for a lesson,
- * each with three difficulty tiers (Easy / Medium / Hard).
- *
- * Route: /lesson/:lessonId/exercises
- *
- * Tier unlock rules (mirrored from backend CategoryProgress):
- *   Easy   — always available
- *   Medium — unlocked after Easy is cleared
- *   Hard   — unlocked after Easy is cleared
- *   Completing Medium OR Hard marks the category as "completed"
- *   Completing Hard also earns a bonus reward (shown as ⭐)
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// ExerciseHubPage.tsx  —  route: /topic/:topicId/exercises
+// ═══════════════════════════════════════════════════════════════════════════
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
-import { ArrowLeft, Lock, Star, CheckCircle, ChevronRight } from "lucide-react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, Lock, Star } from "lucide-react";
 import api from "@/api/client";
-import type { CategoryInfo, Difficulty, LessonCategoriesResponse, TierState } from "@/types/progress";
 import { CATEGORY_LABELS } from "@/constants/categoryLabels";
+import type { TopicCategoriesResponse, CategoryInfo, Difficulty } from "@/types/progress";
 
-// ─── Tier config ──────────────────────────────────────────────────────────────
-
-const TIER_CONFIG: Record<Difficulty, { label: string; color: string; ring: string; bg: string }> = {
-  easy:   { label: "Ușor",  color: "text-emerald-700", ring: "ring-emerald-400", bg: "bg-emerald-50" },
-  medium: { label: "Mediu", color: "text-amber-700",   ring: "ring-amber-400",   bg: "bg-amber-50"   },
-  hard:   { label: "Greu",  color: "text-rose-700",    ring: "ring-rose-400",    bg: "bg-rose-50"    },
+const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  easy: "Ușor",
+  medium: "Mediu",
+  hard: "Greu",
 };
 
-const TIERS: Difficulty[] = ["easy", "medium", "hard"];
-
-// ─── Main page ────────────────────────────────────────────────────────────────
+const DIFFICULTY_COLOR: Record<Difficulty, string> = {
+  easy: "bg-green-100 text-green-700 hover:bg-green-200",
+  medium: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
+  hard: "bg-red-100 text-red-700 hover:bg-red-200",
+};
 
 export default function ExerciseHubPage() {
-  const { lessonId } = useParams<{ lessonId: string }>();
+  const { topicId } = useParams<{ topicId: string }>();
   const navigate = useNavigate();
-  const [data, setData] = useState<LessonCategoriesResponse | null>(null);
+  const [data, setData] = useState<TopicCategoriesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const location = useLocation();
-  const fromOverview = location.state?.from === "exercises-overview";
+  // Back-navigation context — came from exercises overview or lesson
+  const fromExercises = location.state?.from === "/exercises";
 
   useEffect(() => {
-    if (!lessonId) return;
     api
-      .get<LessonCategoriesResponse>(`/progress/lessons/${lessonId}/categories/`)
+      .get<TopicCategoriesResponse>(`/progress/topics/${topicId}/categories/`)
       .then((res) => setData(res.data))
       .catch(() => setError("Nu am putut încărca exercițiile."))
       .finally(() => setLoading(false));
-  }, [lessonId]);
+  }, [topicId]);
 
-  if (loading) return <HubSkeleton />;
-
-  if (error || !data) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 font-medium">{error}</p>
-          <button onClick={() => navigate(-1)} className="mt-4 text-indigo-600 hover:underline text-sm">
-            Înapoi
-          </button>
-        </div>
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  const completedCategories = data.categories.filter(
-    (c) => c.tiers.medium.cleared || c.tiers.hard.cleared,
-  ).length;
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500">{error ?? "Eroare."}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
-          {fromOverview ? (
-  <Link to="/exercises" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors">
-    <ArrowLeft className="w-4 h-4" />
-    <span>Înapoi la Exerciții</span>
-  </Link>
-) : (
-  <Link to={`/lesson/${lessonId}`} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors">
-    <ArrowLeft className="w-4 h-4" />
-    <span>Înapoi la lecție</span>
-  </Link>
-)}
+          <button
+            onClick={() => navigate(fromExercises ? "/exercises" : -1 as any)}
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>{fromExercises ? "Exerciții" : "Înapoi"}</span>
+          </button>
+          <span className="text-gray-300">|</span>
+          <span className="text-sm font-medium text-gray-700 truncate">{data.topic_title}</span>
         </div>
       </div>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Exerciții</h1>
-        <p className="text-gray-500 text-sm mb-2">{data.lesson_title}</p>
+        <h1 className="text-xl font-bold text-gray-900 mb-6">{data.topic_title}</h1>
 
-        {/* Summary bar */}
-        <div className="flex items-center gap-4 mb-8 text-sm text-gray-500">
-          <span>
-            <span className="font-semibold text-gray-800">{completedCategories}</span>
-            {" "}/ {data.categories.length} categorii completate
-          </span>
-          {data.categories.some((c) => c.tiers.hard.cleared) && (
-            <span className="flex items-center gap-1 text-amber-600 font-medium">
-              <Star className="w-3.5 h-3.5 fill-amber-400" />
-              Bonus obținut
-            </span>
-          )}
-        </div>
-
-        {data.categories.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <p>Nu există exerciții disponibile pentru această lecție.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {data.categories.map((cat) => (
-              <CategoryCard key={cat.category} cat={cat} lessonId={lessonId!} />
-            ))}
-          </div>
+        {data.categories.length === 0 && (
+          <p className="text-gray-400 text-center py-12">Nicio categorie disponibilă.</p>
         )}
+
+        <div className="space-y-4">
+          {data.categories.map((cat) => (
+            <CategoryCard
+              key={cat.category}
+              category={cat}
+              topicId={topicId!}
+            />
+          ))}
+        </div>
       </main>
     </div>
   );
 }
 
-// ─── Category card ────────────────────────────────────────────────────────────
+function CategoryCard({
+  category,
+  topicId,
+}: {
+  category: CategoryInfo;
+  topicId: string;
+}) {
+  const navigate = useNavigate();
+  const label = CATEGORY_LABELS[category.category] ?? category.category;
 
-function CategoryCard({ cat, lessonId }: { cat: CategoryInfo; lessonId: string }) {
-  const displayLabel = CATEGORY_LABELS[cat.category] ?? cat.label;
-  const isCompleted = cat.tiers.medium.cleared || cat.tiers.hard.cleared;
-  const hasBonusCleared = cat.tiers.hard.cleared;
+  const startPractice = (difficulty: Difficulty) => {
+    navigate(`/topic/${topicId}/practice`, {
+      state: { category: category.category, difficulty },
+    });
+  };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Category header */}
-      <div className="px-5 py-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              {displayLabel}
-              {isCompleted && (
-                <CheckCircle className="w-4 h-4 text-emerald-500" />
-              )}
-              {hasBonusCleared && (
-                <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
-              )}
-            </h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {cat.exercise_count} exerciții
-              {cat.exercises_attempted > 0 && (
-                <> · {cat.exercises_attempted} încercări · {cat.perfect_batches} sesiuni perfecte</>
-              )}
-            </p>
-          </div>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-900">{label}</h3>
+        <div className="text-xs text-gray-400">
+          {category.exercises_attempted} încercări · {category.perfect_batches} perfecte
         </div>
       </div>
 
-      {/* Tier buttons */}
-      <div className="grid grid-cols-3 divide-x divide-gray-100">
-        {TIERS.map((tier) => (
-          <TierButton
-            key={tier}
-            tier={tier}
-            state={cat.tiers[tier]}
-            lessonId={lessonId}
-            category={cat.category}
-            isHardBonus={tier === "hard"}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Tier button ──────────────────────────────────────────────────────────────
-
-interface TierButtonProps {
-  tier: Difficulty;
-  state: TierState;
-  lessonId: string;
-  category: string;
-  isHardBonus: boolean;
-}
-
-function TierButton({ tier, state, lessonId, category, isHardBonus }: TierButtonProps) {
-  const navigate = useNavigate();
-  const config = TIER_CONFIG[tier];
-  const isLocked = !state.available;
-  const isCleared = state.cleared;
-
-  const handleClick = () => {
-    if (isLocked) return;
-    const params = new URLSearchParams({ category });
-    params.set("difficulty", tier);
-    navigate(`/lesson/${lessonId}/practice?${params}`);
-  };
-
-  if (isLocked) {
-    return (
-      <div className="flex flex-col items-center justify-center py-5 px-3 text-center opacity-40 cursor-not-allowed select-none">
-        <Lock className="w-4 h-4 text-gray-400 mb-1.5" />
-        <span className="text-xs font-medium text-gray-500">{config.label}</span>
-        {isHardBonus && (
-          <span className="text-xs text-amber-500 mt-0.5 flex items-center gap-0.5">
-            <Star className="w-3 h-3 fill-amber-400" /> Bonus
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <button
-      onClick={handleClick}
-      className={`group flex flex-col items-center justify-center py-5 px-3 text-center transition-all hover:${config.bg} focus:outline-none focus-visible:ring-2 ${config.ring}`}
-    >
-      {isCleared ? (
-        <CheckCircle className={`w-5 h-5 mb-1.5 ${config.color}`} />
-      ) : (
-        <ChevronRight className={`w-5 h-5 mb-1.5 ${config.color} opacity-60 group-hover:opacity-100 transition-opacity`} />
-      )}
-      <span className={`text-xs font-semibold ${config.color}`}>{config.label}</span>
-      {isHardBonus && (
-        <span className={`text-xs mt-0.5 flex items-center gap-0.5 ${isCleared ? "text-amber-500" : "text-gray-400"}`}>
-          <Star className={`w-3 h-3 ${isCleared ? "fill-amber-400" : ""}`} /> Bonus
-        </span>
-      )}
-      {isCleared && (
-        <span className={`text-xs mt-1 ${config.color} opacity-60`}>Completat</span>
-      )}
-    </button>
-  );
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
-function HubSkeleton() {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 h-14" />
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-        <div className="h-8 w-48 bg-gray-200 rounded-lg animate-pulse" />
-        <div className="h-4 w-32 bg-gray-100 rounded animate-pulse" />
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />
-              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mt-2" />
-            </div>
-            <div className="grid grid-cols-3 divide-x divide-gray-100">
-              {[1, 2, 3].map((j) => (
-                <div key={j} className="py-5 flex flex-col items-center gap-2">
-                  <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse" />
-                  <div className="h-3 w-10 bg-gray-100 rounded animate-pulse" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+      <div className="flex gap-2">
+        {(["easy", "medium", "hard"] as Difficulty[]).map((diff) => {
+          const tier = category.tiers[diff];
+          if (!tier.available) {
+            return (
+              <div
+                key={diff}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-sm cursor-not-allowed"
+              >
+                <Lock className="w-3 h-3" />
+                <span>{DIFFICULTY_LABEL[diff]}</span>
+              </div>
+            );
+          }
+          return (
+            <button
+              key={diff}
+              onClick={() => startPractice(diff)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${DIFFICULTY_COLOR[diff]} ${
+                tier.cleared ? "ring-2 ring-offset-1 ring-current" : ""
+              }`}
+            >
+              {tier.cleared && <Star className="w-3 h-3 fill-current" />}
+              <span>{DIFFICULTY_LABEL[diff]}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

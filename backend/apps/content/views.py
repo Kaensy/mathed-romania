@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from apps.progress.unlock import get_passed_test_ids, get_unlock_map, is_lesson_unlocked
 
-from .models import GlossaryTerm, Grade, Lesson, Unit
+from .models import GlossaryTerm, Grade, Lesson, Topic, Unit
 from .serializers import (
     GlossaryTermSerializer,
     GradeDetailSerializer,
@@ -26,7 +26,6 @@ class GradeListView(APIView):
 
     List all active grades with unit counts.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -39,30 +38,27 @@ class GradeDetailView(APIView):
     """
     GET /api/v1/content/grades/<grade_number>/
 
-    Full grade with all published units and their lesson lists.
+    Full grade with all published units → topics → lessons.
     Includes per-student unlock state for each lesson.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, grade_number):
         try:
             grade = Grade.objects.prefetch_related(
-                "units__lessons__exercises",
-                "units__lessons__test",
+                "units__topics__lessons",
+                "units__topics__exercises",
+                "units__topics__test",
                 "units__test",
             ).get(number=grade_number, is_active=True)
         except Grade.DoesNotExist:
-            return Response(
-                {"error": "Grade not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"error": "Grade not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Build unlock map for all lessons in this grade
+        # Build unlock map for all published lessons in this grade
         all_lessons = Lesson.objects.filter(
-            unit__grade=grade,
+            topic__unit__grade=grade,
             is_published=True,
-        ).select_related("unit__grade", "test")
+        ).select_related("topic__unit__grade")
         unlock_map = get_unlock_map(all_lessons, request.user)
 
         serializer = GradeDetailSerializer(
@@ -76,24 +72,32 @@ class UnitDetailView(APIView):
     """
     GET /api/v1/content/units/<unit_id>/
 
-    Unit with all its published lessons.
+    Unit with all its published topics and their lessons.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, unit_id):
         try:
             unit = Unit.objects.prefetch_related(
-                "lessons__exercises",
+                "topics__lessons",
+                "topics__exercises",
+                "topics__test",
                 "test",
             ).get(id=unit_id, is_published=True)
         except Unit.DoesNotExist:
-            return Response(
-                {"error": "Unit not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"error": "Unit not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = UnitListSerializer(unit)
+        # Build unlock map for lessons in this unit
+        all_lessons = Lesson.objects.filter(
+            topic__unit=unit,
+            is_published=True,
+        ).select_related("topic__unit__grade")
+        unlock_map = get_unlock_map(all_lessons, request.user)
+
+        serializer = UnitListSerializer(
+            unit,
+            context={"unlock_map": unlock_map, "request": request},
+        )
         return Response(serializer.data)
 
 
@@ -101,25 +105,20 @@ class LessonDetailView(APIView):
     """
     GET /api/v1/content/lessons/<lesson_id>/
 
-    Full lesson with content, exercises, and glossary terms.
+    Full lesson with content blocks and glossary terms.
     Returns 403 if the lesson is locked for this student.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, lesson_id):
         try:
             lesson = Lesson.objects.select_related(
-                "unit__grade",
+                "topic__unit__grade",
             ).prefetch_related(
-                "exercises",
                 "glossary_terms",
             ).get(id=lesson_id, is_published=True)
         except Lesson.DoesNotExist:
-            return Response(
-                {"error": "Lesson not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"error": "Lesson not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Enforce unlock check
         passed_test_ids = get_passed_test_ids(request.user)
@@ -141,7 +140,6 @@ class GlossaryListView(APIView):
 
     Searchable glossary of mathematical terms.
     """
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):

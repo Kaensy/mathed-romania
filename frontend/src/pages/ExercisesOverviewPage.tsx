@@ -1,58 +1,38 @@
-/**
- * ExercisesOverviewPage — global overview of all lessons with exercises.
- *
- * Route: /exercises
- *
- * Shows every published lesson that has at least one active exercise,
- * grouped by unit, with per-lesson completion progress (categories cleared,
- * attempts made). Clicking a lesson card navigates to its ExerciseHubPage.
- */
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, CheckCircle, PenLine, Star } from "lucide-react";
 import api from "@/api/client";
 import { CATEGORY_LABELS } from "@/constants/categoryLabels";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface LessonExerciseSummary {
-  lesson_id: number;
-  lesson_title: string;
-  unit_id: number;
-  unit_title: string;
-  unit_order: number;
-  lesson_order: number;
-  total_categories: number;
-  completed_categories: number;
-  exercises_attempted: number;
-}
-
-interface ExercisesOverviewResponse {
-  lessons: LessonExerciseSummary[];
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
+import type { TopicExerciseSummary, ExercisesOverviewResponse } from "@/types/progress";
 
 export default function ExercisesOverviewPage() {
   const navigate = useNavigate();
-  const [lessons, setLessons] = useState<LessonExerciseSummary[]>([]);
+  const [topics, setTopics] = useState<TopicExerciseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
       .get<ExercisesOverviewResponse>("/progress/exercises-overview/")
-      .then((res) => setLessons(res.data.lessons))
+      .then((res) => setTopics(res.data.topics))
       .catch(() => setError("Nu am putut încărca exercițiile."))
       .finally(() => setLoading(false));
   }, []);
 
-  // Group lessons by unit
-  const byUnit = groupByUnit(lessons);
+  // Group topics by unit
+  const byUnit = groupByUnit(topics);
 
-  const totalCategories = lessons.reduce((s, l) => s + l.total_categories, 0);
-  const completedCategories = lessons.reduce((s, l) => s + l.completed_categories, 0);
-  const totalAttempted = lessons.reduce((s, l) => s + l.exercises_attempted, 0);
+  const totalCategories = topics.reduce((s, t) => s + t.total_categories, 0);
+  const completedCategories = topics.reduce((s, t) => s + t.completed_categories, 0);
+  const totalAttempted = topics.reduce((s, t) => s + t.exercises_attempted, 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -73,144 +53,106 @@ export default function ExercisesOverviewPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Exerciții</h1>
-        <p className="text-gray-500 text-sm mb-6">
-          Toate lecțiile cu exerciții disponibile
-        </p>
+        <p className="text-sm text-gray-500 mb-6">Toate lecțiile cu exerciții disponibile</p>
 
-        {/* Summary strip */}
-        {!loading && !error && lessons.length > 0 && (
-          <div className="flex flex-wrap gap-6 mb-8 text-sm text-gray-500">
+        {/* Summary stats */}
+        {totalCategories > 0 && (
+          <div className="flex items-center gap-6 mb-8 text-sm text-gray-600">
             <span>
-              <span className="font-semibold text-gray-800">{completedCategories}</span>
-              {" / "}{totalCategories} categorii completate
+              <strong className="text-gray-900">{completedCategories}</strong> / {totalCategories} categorii completate
             </span>
             <span>
-              <span className="font-semibold text-gray-800">{totalAttempted}</span>
-              {" "}exerciții rezolvate
+              <strong className="text-gray-900">{totalAttempted}</strong> exerciții rezolvate
             </span>
           </div>
         )}
 
-        {loading && <SkeletonList />}
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-        {error && (
-          <div className="text-center py-16 text-red-500">
-            <p>{error}</p>
-            <button onClick={() => navigate(-1)} className="mt-4 text-indigo-600 hover:underline text-sm">
-              Înapoi
-            </button>
-          </div>
+        {topics.length === 0 && !loading && (
+          <p className="text-gray-400 text-center py-16">Nicio lecție cu exerciții disponibilă momentan.</p>
         )}
 
-        {!loading && !error && lessons.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
-            <PenLine className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p>Nu există exerciții disponibile încă.</p>
-          </div>
-        )}
+        {/* Topics grouped by unit */}
+        <div className="space-y-8">
+          {byUnit.map(({ unitTitle, unitTopics }) => (
+            <section key={unitTitle}>
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                {unitTitle}
+              </h2>
 
-        {!loading && !error && byUnit.map(({ unitTitle, unitOrder, lessons: unitLessons }) => (
-          <section key={unitOrder} className="mb-10">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-              {unitTitle}
-            </h2>
-            <div className="space-y-3">
-              {unitLessons.map((lesson) => (
-                <LessonCard key={lesson.lesson_id} lesson={lesson} />
-              ))}
-            </div>
-          </section>
-        ))}
+              <div className="space-y-3">
+                {unitTopics.map((topic, indexInUnit) => {
+                  // Sequential number across entire list
+                  const globalIndex = topics.indexOf(topic) + 1;
+                  const progressPct =
+                    topic.total_categories > 0
+                      ? Math.round((topic.completed_categories / topic.total_categories) * 100)
+                      : 0;
+                  const isComplete = progressPct === 100 && topic.total_categories > 0;
+
+                  return (
+                    <button
+                      key={topic.topic_id}
+                      onClick={() => navigate(`/topic/${topic.topic_id}/exercises`)}
+                      className="w-full bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 text-left hover:border-indigo-300 hover:shadow transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-500">
+                            {globalIndex}.
+                          </span>
+                          <span className="font-semibold text-gray-900">
+                            {topic.topic_title}
+                          </span>
+                          {isComplete && (
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold text-gray-700">
+                          {progressPct}%
+                        </span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            isComplete ? "bg-green-500" : "bg-indigo-500"
+                          }`}
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs text-gray-400">
+                        <span>
+                          {topic.completed_categories}/{topic.total_categories} categor{topic.total_categories === 1 ? "ie" : "ii"}
+                        </span>
+                        {topic.exercises_attempted > 0 && (
+                          <span>{topic.exercises_attempted} încercări</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
       </main>
     </div>
   );
 }
 
-// ─── Lesson card ──────────────────────────────────────────────────────────────
-
-function LessonCard({ lesson }: { lesson: LessonExerciseSummary }) {
-  const isAllDone = lesson.completed_categories === lesson.total_categories && lesson.total_categories > 0;
-  const pct = lesson.total_categories > 0
-    ? Math.round((lesson.completed_categories / lesson.total_categories) * 100)
-    : 0;
-
-  return (
-    <Link
-  to={`/lesson/${lesson.lesson_id}/exercises`}
-  state={{ from: "exercises-overview" }}
-      className="block bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4
-        hover:border-indigo-300 hover:shadow-md transition-all"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 font-mono shrink-0">
-              {lesson.lesson_order}.
-            </span>
-            <h3 className="font-semibold text-gray-900 text-sm truncate">
-              {lesson.lesson_title}
-            </h3>
-            {isAllDone && (
-              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-            )}
-          </div>
-
-          {/* Progress bar */}
-          <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-1.5 rounded-full transition-all duration-500 ${
-                isAllDone ? "bg-emerald-500" : "bg-indigo-400"
-              }`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-
-          {/* Stats row */}
-          <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-400">
-            <span>
-              {lesson.completed_categories}/{lesson.total_categories} categorii
-            </span>
-            {lesson.exercises_attempted > 0 && (
-              <span>{lesson.exercises_attempted} încercări</span>
-            )}
-          </div>
-        </div>
-
-        <div className="text-xs font-medium text-gray-400 shrink-0 pt-0.5">
-          {pct}%
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function groupByUnit(lessons: LessonExerciseSummary[]) {
-  const map = new Map<number, { unitTitle: string; unitOrder: number; lessons: LessonExerciseSummary[] }>();
-  for (const lesson of lessons) {
-    if (!map.has(lesson.unit_id)) {
-      map.set(lesson.unit_id, {
-        unitTitle: lesson.unit_title,
-        unitOrder: lesson.unit_order,
-        lessons: [],
-      });
-    }
-    map.get(lesson.unit_id)!.lessons.push(lesson);
+function groupByUnit(topics: TopicExerciseSummary[]) {
+  const map = new Map<string, TopicExerciseSummary[]>();
+  for (const topic of topics) {
+    const key = topic.unit_title;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(topic);
   }
-  return Array.from(map.values()).sort((a, b) => a.unitOrder - b.unitOrder);
-}
-
-function SkeletonList() {
-  return (
-    <div className="space-y-3 animate-pulse">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-200 px-5 py-4">
-          <div className="h-4 bg-gray-200 rounded w-2/3 mb-2" />
-          <div className="h-1.5 bg-gray-100 rounded-full" />
-          <div className="h-3 bg-gray-100 rounded w-1/3 mt-1.5" />
-        </div>
-      ))}
-    </div>
-  );
+  return Array.from(map.entries()).map(([unitTitle, unitTopics]) => ({
+    unitTitle,
+    unitTopics,
+  }));
 }

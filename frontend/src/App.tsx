@@ -58,12 +58,12 @@ function AppRoutes() {
             />
       <Route path="/lesson/:lessonId" element={ <ProtectedRoute> <LessonViewer /> </ProtectedRoute> } />
       <Route path="/grade/:gradeNumber" element={ <ProtectedRoute> <GradePage /> </ProtectedRoute> } />
-      <Route path="/lesson/:lessonId/practice" element={ <ProtectedRoute><PracticePage /></ProtectedRoute>} />
       <Route path="/test/:testId" element={<ProtectedRoute><TestPage /></ProtectedRoute>} />
-      <Route path="/lesson/:lessonId/exercises" element={<ProtectedRoute><ExerciseHubPage /></ProtectedRoute>} />
       <Route path="/exercises" element={<ProtectedRoute><ExercisesOverviewPage /></ProtectedRoute>} />
       <Route path="/tests" element={<ProtectedRoute><TestsOverviewPage /></ProtectedRoute>} />
       <Route path="/admin-preview/exercise/:exerciseId" element={<ProtectedRoute><AdminPreviewPage /></ProtectedRoute>} />
+      <Route path="/topic/:topicId/exercises" element={<ExerciseHubPage />} />
+      <Route path="/topic/:topicId/practice"  element={<PracticePage />} />
 
 
       {/* Default redirect */}

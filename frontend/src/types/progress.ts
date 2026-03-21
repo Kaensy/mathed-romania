@@ -1,6 +1,12 @@
-// ─── Exercise instance (returned by /practice/ endpoint) ─────────────────────
+// ─── Exercise instance ────────────────────────────────────────────────────────
 
-export type ExerciseType = "fill_blank" | "multi_fill_blank" | "multiple_choice" | "comparison" | "drag_order";
+export type ExerciseType =
+  | "fill_blank"
+  | "multi_fill_blank"
+  | "multiple_choice"
+  | "comparison"
+  | "drag_order";
+
 export type Difficulty = "easy" | "medium" | "hard";
 
 export interface ExerciseOption {
@@ -9,8 +15,8 @@ export interface ExerciseOption {
 }
 
 export interface MultiField {
-  key: string;    // e.g. "a", "b", "c", "d"
-  label: string;  // displayed next to the input
+  key: string;
+  label: string;
 }
 
 export interface ExerciseInstance {
@@ -44,16 +50,16 @@ export interface ExerciseInstance {
   order_direction?: "ascending" | "descending";
 }
 
-// ─── Practice session (returned by /practice/ endpoint) ───────────────────────
+// ─── Practice session ─────────────────────────────────────────────────────────
 
 export interface PracticeSession {
-  lesson_id: number;
-  session_id: string;   // UUID — must be sent back with every attempt
+  topic_id: number;
+  session_id: string;
   exercises: ExerciseInstance[];
   practice_minimum: number;
 }
 
-// ─── Attempt submission ────────────────────────────────────────────────────────
+// ─── Attempt submission ───────────────────────────────────────────────────────
 
 export interface AttemptPayload {
   exercise_id: number;
@@ -65,11 +71,11 @@ export interface AttemptPayload {
 export interface AttemptResult {
   is_correct: boolean;
   correct_answer: string | null;
-  tier_cleared: Difficulty | null;  // non-null when a tier was just unlocked
+  tier_cleared: Difficulty | null;
   error: string | null;
 }
 
-// ─── Category tier state ───────────────────────────────────────────────────────
+// ─── Category tier state ──────────────────────────────────────────────────────
 
 export interface TierState {
   available: boolean;
@@ -82,8 +88,6 @@ export interface CategoryTiers {
   hard: TierState;
 }
 
-// ─── Category info (returned by /categories/ endpoint) ────────────────────────
-
 export interface CategoryInfo {
   category: string;
   label: string;
@@ -93,13 +97,13 @@ export interface CategoryInfo {
   tiers: CategoryTiers;
 }
 
-export interface LessonCategoriesResponse {
-  lesson_id: number;
-  lesson_title: string;
+export interface TopicCategoriesResponse {
+  topic_id: number;
+  topic_title: string;
   categories: CategoryInfo[];
 }
 
-// ─── Dashboard ─────────────────────────────────────────────────────────────────
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export interface UnitProgress {
   unit_id: number;
@@ -116,4 +120,43 @@ export interface DashboardStats {
   exercises_attempted: number;
   perfect_batches: number;
   units: UnitProgress[];
+}
+
+// ─── Exercises overview ───────────────────────────────────────────────────────
+
+export interface TopicExerciseSummary {
+  topic_id: number;
+  topic_title: string;
+  unit_id: number;
+  unit_title: string;
+  unit_order: number;
+  topic_order: number;
+  total_categories: number;
+  completed_categories: number;
+  exercises_attempted: number;
+}
+
+export interface ExercisesOverviewResponse {
+  topics: TopicExerciseSummary[];
+}
+
+// ─── Tests overview ───────────────────────────────────────────────────────────
+
+export interface TopicTestSummary {
+  test_id: number;
+  topic_id: number;
+  topic_title: string;
+  unit_id: number;
+  unit_title: string;
+  unit_order: number;
+  topic_order: number;
+  pass_threshold: number;
+  time_limit_minutes: number | null;
+  attempts_count: number;
+  passed: boolean | null;
+  best_score: number | null;
+}
+
+export interface TestsOverviewResponse {
+  tests: TopicTestSummary[];
 }

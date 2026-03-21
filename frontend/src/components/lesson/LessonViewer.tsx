@@ -133,9 +133,9 @@ export default function LessonViewer() {
               {/* Bottom navigation */}
               <div className="mt-12 pt-6 border-t border-gray-200 space-y-4">
 
-                  {lesson.lesson_test_id && (
+                  {lesson.topic_test_id && (
   <Link
-    to={`/test/${lesson.lesson_test_id}`}
+    to={`/test/${lesson.topic_test_id}`}
     className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
       bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors"
   >
@@ -144,17 +144,17 @@ export default function LessonViewer() {
   </Link>
 )}
 
-                  {/* Practice button — shown if lesson has exercises */}
-                  {lesson.exercises.length > 0 && (
-                      <Link
-                          to={`/lesson/${lessonId}/exercises`}
-                          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
-        bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
-                      >
-                          <PenLine className="w-4 h-4" />
-                          Exersează — {lesson.exercises.length} exerciții
-                      </Link>
-                  )}
+{lesson.topic_exercise_count > 0 && (
+  <Link
+    to={`/topic/${lesson.topic_id}/exercises`}
+    state={{ from: `/lesson/${lessonId}` }}
+    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
+      bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+  >
+    <PenLine className="w-4 h-4" />
+    Exersează — {lesson.topic_exercise_count} exerciții
+  </Link>
+)}
 
                   {/* Prev / Next */}
                   <div className="flex items-center justify-between">
