@@ -6,6 +6,7 @@
  * Display modes (set via template "display_mode" field):
  *   comparison + drag_symbol  → drag <, =, > into the box between two numbers
  *   drag_order + drag_number  → drag number chips into ordered position slots
+ *   fill_blank + follow_up    → two-phase: first answer → reveal follow-up question
  */
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle, XCircle, ChevronRight, Trophy } from "lucide-react";
@@ -58,9 +59,21 @@ export default function ExerciseCard({
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // ── Follow-up state ──────────────────────────────────────────────────────
+  const [followUpAnswer, setFollowUpAnswer] = useState("");
+  const [followUpResult, setFollowUpResult] = useState<"pending" | "correct" | "incorrect">("pending");
+  const followUpRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!result) inputRef.current?.focus();
   }, [result]);
+
+  // Focus follow-up input when it appears
+  useEffect(() => {
+    if (result?.is_correct && result?.follow_up && followUpResult === "pending") {
+      followUpRef.current?.focus();
+    }
+  }, [result, followUpResult]);
 
   const isAnswerEmpty = (): boolean => {
     if (typeof answer === "string") return answer.trim() === "";
@@ -98,10 +111,33 @@ export default function ExerciseCard({
     }
   };
 
+  const submitFollowUp = () => {
+    if (!result?.follow_up || followUpAnswer.trim() === "") return;
+    const expected = result.follow_up.expected;
+    // Client-side check: compare as numbers
+    const studentNum = parseFloat(followUpAnswer.trim());
+    const expectedNum = parseFloat(expected);
+    if (!isNaN(studentNum) && !isNaN(expectedNum) && studentNum === expectedNum) {
+      setFollowUpResult("correct");
+    } else {
+      setFollowUpResult("incorrect");
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      if (result) onNext();
-      else submit();
+      // Phase 1: no result yet → submit main answer
+      if (!result) {
+        submit();
+        return;
+      }
+      // Phase 2: follow-up pending → submit follow-up
+      if (result.follow_up && followUpResult === "pending") {
+        submitFollowUp();
+        return;
+      }
+      // Phase 3: everything done → next exercise
+      onNext();
     }
   };
 
@@ -222,6 +258,7 @@ export default function ExerciseCard({
       {/* Result feedback */}
       {result && (
         <>
+          {/* ── Main answer result ──────────────────────────────── */}
           <div className={`rounded-xl p-4 mb-4 ${
             result.is_correct ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
           }`}>
@@ -249,17 +286,70 @@ export default function ExerciseCard({
             </p>
           </div>
 
-          <button
-            onClick={onNext}
-            onKeyDown={(e) => e.key === "Enter" && onNext()}
-            className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-          >
-            {isLast ? (
-              <><Trophy className="w-4 h-4" /> Finalizează</>
-            ) : (
-              <><span>Următorul</span><ChevronRight className="w-4 h-4" /></>
-            )}
-          </button>
+          {/* ── Follow-up phase (correct + follow_up exists + not yet answered) ── */}
+          {result.is_correct && result.follow_up && followUpResult === "pending" && (
+            <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4 mb-4 space-y-3">
+              <p className="text-amber-800 font-medium">
+                <InlineMath text={result.follow_up.question} />
+              </p>
+              <input
+                ref={followUpRef}
+                type="text"
+                value={followUpAnswer}
+                onChange={(e) => setFollowUpAnswer(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Răspuns..."
+                className="w-full px-4 py-3 border-2 border-amber-300 rounded-xl focus:border-amber-500 focus:outline-none text-lg bg-white"
+              />
+              <button
+                onClick={submitFollowUp}
+                disabled={followUpAnswer.trim() === ""}
+                className="w-full py-3 bg-amber-500 text-white font-semibold rounded-xl hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Verifică
+              </button>
+            </div>
+          )}
+
+          {/* ── Follow-up result ──────────────────────────────── */}
+          {result.is_correct && result.follow_up && followUpResult !== "pending" && (
+            <div className={`rounded-xl p-4 mb-4 ${
+              followUpResult === "correct"
+                ? "bg-emerald-50 border border-emerald-200"
+                : "bg-orange-50 border border-orange-200"
+            }`}>
+              <div className="flex items-center gap-2 font-semibold">
+                {followUpResult === "correct" ? (
+                  <><CheckCircle className="w-5 h-5 text-emerald-600" /><span className="text-emerald-700">Excelent! Ai găsit ambele posibilități!</span></>
+                ) : (
+                  <><XCircle className="w-5 h-5 text-orange-600" /><span className="text-orange-700">Nu chiar — cealaltă posibilitate era:</span></>
+                )}
+              </div>
+              {followUpResult === "incorrect" && (
+                <p className="text-sm text-orange-600 mt-1 font-mono">
+                  {result.follow_up.expected}
+                </p>
+              )}
+              <p className="text-sm text-gray-400 mt-1">
+                Răspunsul tău: <span className="font-mono">{followUpAnswer}</span>
+              </p>
+            </div>
+          )}
+
+          {/* ── Next button (only when everything is done) ──── */}
+          {(!result.follow_up || followUpResult !== "pending") && (
+            <button
+              onClick={onNext}
+              onKeyDown={(e) => e.key === "Enter" && onNext()}
+              className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+            >
+              {isLast ? (
+                <><Trophy className="w-4 h-4" /> Finalizează</>
+              ) : (
+                <><span>Următorul</span><ChevronRight className="w-4 h-4" /></>
+              )}
+            </button>
+          )}
         </>
       )}
     </div>

@@ -283,22 +283,46 @@ class ExerciseAttemptView(APIView):
             return Response({"error": "Exercițiul nu există."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            grading_data = decode_instance_token(instance_token)
+            payload = decode_instance_token(instance_token)
+            grading_data = payload.get("grading_data", payload)
         except Exception:
             return Response({"error": "Token invalid."}, status=status.HTTP_400_BAD_REQUEST)
 
-        is_correct, correct_answer = grade_attempt(
+        is_correct, error = grade_attempt(
             exercise.exercise_type,
-            grading_data,
             answer,
+            grading_data,
         )
+
+        correct_display = _correct_answer_display(exercise.exercise_type, grading_data) if not is_correct else None
+
+        # Build follow-up data if this is a multi-answer exercise and student got it right
+        follow_up = None
+        if is_correct and "correct_exprs" in grading_data and error is not None:
+            try:
+                matched_idx = int(error)
+                other_idx = 1 - matched_idx
+                other_expr = grading_data["correct_exprs"][other_idx]
+                try:
+                    from apps.progress.grading import TRANSFORMATIONS, normalize
+                    from sympy.parsing.sympy_parser import parse_expr
+                    other_value = str(parse_expr(normalize(other_expr), transformations=TRANSFORMATIONS))
+                except Exception:
+                    other_value = other_expr
+                follow_up = {
+                    "question": grading_data.get("follow_up_question", ""),
+                    "expected": other_value,
+                }
+            except (ValueError, IndexError):
+                pass
 
         if is_preview:
             return Response({
                 "is_correct": is_correct,
-                "correct_answer": correct_answer,
+                "correct_answer": correct_display,
+                "follow_up": follow_up,
                 "tier_cleared": None,
-                "error": None,
+                "error": error if not is_correct else None,
             })
 
         ExerciseAttempt.objects.create(
@@ -313,11 +337,14 @@ class ExerciseAttemptView(APIView):
         if session_id:
             tier_cleared = self._check_tier_cleared(request.user, session_id, exercise)
 
+        correct_display = _correct_answer_display(exercise.exercise_type, grading_data) if not is_correct else None
+
         return Response({
             "is_correct": is_correct,
-            "correct_answer": correct_answer,
-            "tier_cleared": tier_cleared,
-            "error": None,
+            "correct_answer": correct_display,
+            "follow_up": follow_up,
+            "tier_cleared": None,
+            "error": error if not is_correct else None,
         })
 
     def _check_tier_cleared(self, user, session_id, exercise):
@@ -705,9 +732,10 @@ class TestFinishView(APIView):
 
             try:
                 exercise = Exercise.objects.get(id=exercise_id)
-                grading_data = decode_instance_token(instance_token)
+                payload = decode_instance_token(instance_token)
+                grading_data = payload.get("grading_data", payload)
                 is_correct, correct_answer = grade_attempt(
-                    exercise.exercise_type, grading_data, student_answer
+                    exercise.exercise_type, student_answer, grading_data
                 )
             except Exception:
                 is_correct = False
@@ -806,6 +834,16 @@ def _correct_answer_display(exercise_type: str, grading_data: dict) -> str:
         parts = [f"{k} = {v}" for k, v in grading_data.get("correct_map", {}).items()]
         return ", ".join(parts)
     elif exercise_type == "fill_blank":
+        if "correct_exprs" in grading_data:
+            displays = []
+            for expr in grading_data["correct_exprs"]:
+                try:
+                    from apps.progress.grading import TRANSFORMATIONS, normalize
+                    from sympy.parsing.sympy_parser import parse_expr
+                    displays.append(str(parse_expr(normalize(expr), transformations=TRANSFORMATIONS)))
+                except Exception:
+                    displays.append(expr)
+            return " sau ".join(displays)
         if "valid_set" in grading_data:
             if grading_data.get("answer_display"):
                 return grading_data["answer_display"]

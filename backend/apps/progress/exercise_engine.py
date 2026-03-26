@@ -222,6 +222,16 @@ def _build_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
             "correct_expr": _fill(template["answer_expr"], params),
         }
 
+    # ── Follow-up mode: two valid answers ────────────────────────────────
+    if "alt_answer_expr" in template:
+        alt_expr = _fill(template["alt_answer_expr"], params)
+        grading = {
+            "correct_exprs": [_fill(template["answer_expr"], params), alt_expr],
+            "follow_up_question": _fill(template.get("follow_up_question", ""), params),
+        }
+        frontend["display_mode"] = "follow_up"
+        frontend["follow_up_question"] = _fill(template.get("follow_up_question", ""), params)
+
     return frontend, grading
 
 def _build_multi_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:

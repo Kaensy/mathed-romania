@@ -34,6 +34,7 @@ export interface ExerciseInstance {
   // fill_blank
   answer_input?: "number" | "expression";
   placeholder?: string;
+  follow_up_question?: string;
 
   // multi_fill_blank
   fields?: MultiField[];
@@ -68,12 +69,18 @@ export interface AttemptPayload {
   session_id: string | null;
 }
 
-export interface AttemptResult {
-  is_correct: boolean;
-  correct_answer: string | null;
-  tier_cleared: Difficulty | null;
-  error: string | null;
+export interface FollowUp {
+    question: string;
+    expected: string;
 }
+
+export interface AttemptResult {
+    is_correct: boolean;
+    correct_answer: string | null;
+    follow_up?: FollowUp | null;
+    tier_cleared: Difficulty | null;
+    error: string | null;
+  }
 
 // ─── Category tier state ──────────────────────────────────────────────────────
 

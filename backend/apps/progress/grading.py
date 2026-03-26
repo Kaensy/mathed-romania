@@ -191,6 +191,14 @@ def grade_attempt(
         grading_data:    dict from exercise_engine with grading keys
     """
     if exercise_type == "fill_blank":
+        # Multi-answer follow-up grading
+        if "correct_exprs" in grading_data:
+            for i, expr in enumerate(grading_data["correct_exprs"]):
+                ok, err = grade_expression(str(student_answer), expr)
+                if ok:
+                    return True, str(i)  # matched index
+            return False, None
+
         # Set-membership grading
         if "valid_set" in grading_data:
             try:
@@ -198,6 +206,7 @@ def grade_attempt(
                 return student_int in grading_data["valid_set"], None
             except (ValueError, TypeError):
                 return False, "invalid_format"
+
         # Standard symbolic grading
         return grade_expression(str(student_answer), grading_data["correct_expr"])
 
