@@ -35,10 +35,17 @@ export const CATEGORY_LABELS: Record<string, string> = {
   multiplication:     "Înmulțire",
   last_digit:         "Ultima cifră",
   distributivity:     "Distributivitate",
+  multiplication_compute: "Calcul cu înmulțiri",
+  find_x_multiplication: "Aflarea necunoscutei",
+  common_factor: "Factor comun",
 
   // 1.7
   division_exact:     "Împărțire exactă",
   division_remainder: "Împărțire cu rest",
+  division_compute: "Calcul cu împărțiri",
+  find_x_division: "Aflarea necunoscutei (împărțire)",
+  division_remainder_compute: "Calcul cu rest",
+  find_from_division_theorem: "Teorema împărțirii cu rest",
 
   // 1.8
   powers:             "Puteri",

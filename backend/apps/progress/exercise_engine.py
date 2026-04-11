@@ -82,6 +82,7 @@ drag_order
 """
 import random
 from typing import Any
+from math import factorial
 
 from django.core import signing
 

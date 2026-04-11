@@ -31,6 +31,17 @@ ALL_MODULES = [
     "exercises.find_x_subtraction",
     "exercises.sum_and_difference",
 
+    # 1.6 - Inmultire
+    "exercises.multiplication_compute",
+    "exercises.find_x_multiplication",
+    "exercises.common_factor",
+
+    # 1.7 - Impartire
+    "exercises.division_compute",
+    "exercises.find_x_division",
+    "exercises.division_remainder_compute",
+    "exercises.find_from_division_theorem",
+
     # Add new modules here as they're created
 ]
 
