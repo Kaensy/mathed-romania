@@ -152,28 +152,66 @@ export default function ExerciseCard({
       {!result && (
         <div className="space-y-4">
           {exercise.exercise_type === "multi_fill_blank" && exercise.fields ? (
-            <div className="space-y-3">
-              {exercise.fields.map((field) => (
-                <div key={field.key} className="flex items-center gap-3">
-                  <span className="text-gray-700 font-medium w-6 text-right shrink-0">
-                    <InlineMath text={field.label} /> =
-                  </span>
-                  <input
-                    type="text"
-                    value={(answer as Record<string, string>)[field.key] ?? ""}
-                    onChange={(e) =>
-                      setAnswer((prev) => ({
-                        ...(prev as Record<string, string>),
-                        [field.key]: e.target.value,
-                      }))
-                    }
-                    onKeyDown={handleKeyDown}
-                    placeholder="răspuns..."
-                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-lg"
-                  />
-                </div>
-              ))}
-            </div>
+            exercise.display_mode === "inline_between" && exercise.between_value ? (
+              // ── Inline between layout: [ ] < n < [ ] ──
+              <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+                <input
+                  type="text"
+                  value={(answer as Record<string, string>)[exercise.fields[0].key] ?? ""}
+                  onChange={(e) =>
+                    setAnswer((prev) => ({
+                      ...(prev as Record<string, string>),
+                      [exercise.fields![0].key]: e.target.value,
+                    }))
+                  }
+                  onKeyDown={handleKeyDown}
+                  placeholder="?"
+                  className="w-24 px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-lg text-center font-semibold"
+                />
+                <span className="text-2xl text-gray-400 font-bold">&lt;</span>
+                <span className="text-2xl text-gray-800 font-semibold px-2">
+                  <InlineMath text={`$${exercise.between_value}$`} />
+                </span>
+                <span className="text-2xl text-gray-400 font-bold">&lt;</span>
+                <input
+                  type="text"
+                  value={(answer as Record<string, string>)[exercise.fields[1].key] ?? ""}
+                  onChange={(e) =>
+                    setAnswer((prev) => ({
+                      ...(prev as Record<string, string>),
+                      [exercise.fields![1].key]: e.target.value,
+                    }))
+                  }
+                  onKeyDown={handleKeyDown}
+                  placeholder="?"
+                  className="w-24 px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-lg text-center font-semibold"
+                />
+              </div>
+            ) : (
+              // ── Default stacked layout ──
+              <div className="space-y-3">
+                {exercise.fields.map((field) => (
+                  <div key={field.key} className="flex items-center gap-3">
+                    <span className="text-gray-700 font-medium w-6 text-right shrink-0">
+                      <InlineMath text={field.label} /> =
+                    </span>
+                    <input
+                      type="text"
+                      value={(answer as Record<string, string>)[field.key] ?? ""}
+                      onChange={(e) =>
+                        setAnswer((prev) => ({
+                          ...(prev as Record<string, string>),
+                          [field.key]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={handleKeyDown}
+                      placeholder="răspuns..."
+                      className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-lg"
+                    />
+                  </div>
+                ))}
+              </div>
+            )
 
           ) : exercise.display_mode === "digit_click" ? (
             <DigitClickInput
@@ -380,7 +418,7 @@ function DragSymbolInput({
       {/* Numbers + drop zone row */}
       <div className="flex items-center justify-center gap-5">
         <div className="text-2xl font-bold text-gray-800 min-w-[80px] text-right">
-          <InlineMath text={left} />
+          <InlineMath text={`$${left}$`} />
         </div>
 
         {/* Drop zone */}
@@ -399,7 +437,7 @@ function DragSymbolInput({
         </div>
 
         <div className="text-2xl font-bold text-gray-800 min-w-[80px] text-left">
-          <InlineMath text={right} />
+          <InlineMath text={`$${right}$`} />
         </div>
       </div>
 
@@ -453,6 +491,7 @@ function DragNumberInput({
   );
   const [pool, setPool] = useState<string[]>(() => [...items]);
   const draggingFrom = useRef<{ source: "pool" | "slot"; index: number } | null>(null);
+  const justDragged = useRef(false);
 
   const commit = (newSlots: (string | null)[], newPool: string[]) => {
     setSlots(newSlots);
@@ -504,6 +543,18 @@ function DragNumberInput({
           {slots.map((slot, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div
+                    draggable={!!slot}
+                    onDragStart={() => {
+                      if (slot) {
+                        draggingFrom.current = { source: "slot", index: i };
+                        justDragged.current = true;
+                      }
+                    }}
+                    onDragEnd={() => {
+                      draggingFrom.current = null;
+                      // Clear flag after the click event would have fired
+                      setTimeout(() => { justDragged.current = false; }, 0);
+                    }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => {
                       const src = draggingFrom.current;
@@ -512,15 +563,18 @@ function DragNumberInput({
                       if (!item) return;
                       placeInSlot(i, item, src.source === "pool", src.source === "slot" ? src.index : undefined);
                     }}
-                    onClick={() => slot && returnToPool(i)}
+                    onClick={() => {
+                      if (justDragged.current) return;
+                      if (slot) returnToPool(i);
+                    }}
                     className={`w-20 h-14 rounded-xl border-2 flex items-center justify-center
-          text-sm font-bold transition-all
+          text-sm font-bold transition-all select-none
           ${slot
-                        ? "border-indigo-400 bg-indigo-50 text-indigo-700 cursor-pointer hover:border-red-300 hover:bg-red-50 hover:text-red-500"
+                        ? "border-indigo-400 bg-indigo-50 text-indigo-700 cursor-grab active:cursor-grabbing hover:border-red-300 hover:bg-red-50 hover:text-red-500"
                         : "border-dashed border-gray-300 bg-gray-50 text-gray-300 cursor-default"
                     }`}
                 >
-                  {slot ? <InlineMath text={slot}/> : <span className="text-lg">?</span>}
+                  {slot ? <InlineMath text={`$${slot}$`}/> : <span className="text-lg">?</span>}
                 </div>
                 {i < slots.length - 1 && (
                     <span className="text-gray-400 font-bold text-lg">
@@ -531,14 +585,22 @@ function DragNumberInput({
           ))}
         </div>
 
-        {/* Number chips pool */}
-        <div className="flex flex-wrap justify-center gap-3 min-h-[56px] py-1">
+        {/* Number chips pool — also a drop target for returning slot items */}
+        <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => {
+              const src = draggingFrom.current;
+              if (!src || src.source !== "slot") return;
+              returnToPool(src.index);
+            }}
+            className="flex flex-wrap justify-center gap-3 min-h-[56px] py-1 rounded-xl"
+        >
           {pool.map((item, i) => (
               <div
                   key={`${item}-${i}`}
                   draggable
                   onDragStart={() => {
-                    draggingFrom.current = {source: "pool", index: i};
+                    draggingFrom.current = { source: "pool", index: i };
                   }}
                   onDragEnd={() => {
                     draggingFrom.current = null;
@@ -551,7 +613,7 @@ function DragNumberInput({
               justify-center text-sm font-bold text-gray-700 cursor-grab active:cursor-grabbing
               select-none hover:border-indigo-300 hover:bg-indigo-50 transition-all"
               >
-                <InlineMath text={item}/>
+                <InlineMath text={`$${item}$`}/>
               </div>
           ))}
           {pool.length === 0 && (
@@ -560,7 +622,7 @@ function DragNumberInput({
         </div>
 
         <p className="text-xs text-gray-400 text-center">
-          Trage sau apasă numerele · apasă un slot pentru a returna
+          Trage numerele între sloturi sau înapoi în listă · apasă un slot pentru a returna
         </p>
       </div>
   );
@@ -622,9 +684,9 @@ function ComparisonInput({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-center gap-6 py-4 bg-gray-50 rounded-xl">
-        <InlineMath text={left} />
+        <InlineMath text={`$${left}$`} />
         <span className="text-2xl text-gray-300">?</span>
-        <InlineMath text={right} />
+        <InlineMath text={`$${right}$`} />
       </div>
       <div className="flex justify-center gap-3">
         {options.map((opt) => (
@@ -681,7 +743,7 @@ function DragOrderInput({
             bg-gray-50 text-sm font-medium text-gray-700 cursor-grab active:cursor-grabbing select-none"
         >
           <span className="text-gray-300">⠿</span>
-          <InlineMath text={item} />
+          <InlineMath text={`$${item}$`} />
         </div>
       ))}
       <p className="text-xs text-gray-400 mt-1">Trage elementele pentru a le reordona.</p>

@@ -24,7 +24,7 @@ export interface ExerciseInstance {
   exercise_type: ExerciseType;
   difficulty: Difficulty;
   instance_token: string;
-  display_mode?: "digit_click" | string;
+  display_mode?: "digit_click" | "drag_symbol" | "drag_number" | "inline_between" | string;
   number_string?: string;
 
   // Common
@@ -38,6 +38,7 @@ export interface ExerciseInstance {
 
   // multi_fill_blank
   fields?: MultiField[];
+  between_value?: string;
 
   // multiple_choice & comparison
   options?: ExerciseOption[];

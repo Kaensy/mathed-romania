@@ -42,6 +42,30 @@ ALL_MODULES = [
     "exercises.division_remainder_compute",
     "exercises.find_from_division_theorem",
 
+    # 1.8 - Puteri
+    "exercises.power_notation",
+    "exercises.power_compute",
+    "exercises.power_rules_simplify",
+    "exercises.power_common_factor",
+    "exercises.find_x_powers",
+    "exercises.power_last_digit",
+    "exercises.power_sum_telescope",
+    "exercises.power_compare",
+    "exercises.power_order",
+    "exercises.perfect_square_identify",
+    "exercises.perfect_square_between",
+
+    # 1.9 - Baze de numeratie
+    "exercises.convert_to_base10",
+    "exercises.convert_from_base10",
+    "exercises.mixed_base_compute",
+
+    # 1.10 - Ordinea operatiilor
+    "exercises.order_of_ops_basic",
+    "exercises.order_of_ops_parens",
+    "exercises.order_of_ops_nested",
+
+
     # Add new modules here as they're created
 ]
 

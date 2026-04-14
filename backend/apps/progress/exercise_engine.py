@@ -83,6 +83,7 @@ drag_order
 import random
 from typing import Any
 from math import factorial
+import re
 
 from django.core import signing
 
@@ -200,6 +201,36 @@ def _fill(template_str: str, params: dict) -> str:
     return result
 
 
+def _to_katex(expr: str) -> str:
+    """
+    Convert a Python-style arithmetic expression to a KaTeX-renderable form.
+
+    Handles:
+      - `a**b`       →  `a^{b}`       (works for digits, parenthesized exps)
+      - `a * b`      →  `a \\cdot b`
+      - `a : b`      →  `a : b`       (left as-is — Romanian division)
+      - Parentheses, digits, and variables pass through.
+
+    Examples:
+      >>> _to_katex("2**100")
+      '2^{100}'
+      >>> _to_katex("2**(n+1) + 2**n")
+      '2^{n+1} + 2^{n}'
+      >>> _to_katex("3 * 2**n")
+      '3 \\cdot 2^{n}'
+    """
+    s = expr
+
+    # ** (parenthesized exponent):  a**(expr)  →  a^{expr}
+    s = re.sub(r"\*\*\(([^()]*)\)", r"^{\1}", s)
+    # ** (bare exponent):            a**123     →  a^{123}
+    s = re.sub(r"\*\*([A-Za-z0-9_]+)", r"^{\1}", s)
+
+    # Multiplication: * → \cdot (with spaces preserved)
+    s = re.sub(r"\s*\*\s*", r" \\cdot ", s)
+
+    return s
+
 # ─── Per-type instance builders ───────────────────────────────────────────────
 
 def _build_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
@@ -235,6 +266,7 @@ def _build_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
 
     return frontend, grading
 
+
 def _build_multi_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
     """
     Multi-field fill-in-the-blank. Student fills in one input per field.
@@ -246,11 +278,11 @@ def _build_multi_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
       "params": { ... },
       "fields": [
         {"key": "a", "label": "a", "answer_expr": "{p}"},
-        {"key": "b", "label": "b", "answer_expr": "{q}"},
-        {"key": "c", "label": "c", "answer_expr": "{r}"},
-        {"key": "d", "label": "d", "answer_expr": "{s}"}
+        ...
       ],
-      "hint": "..."
+      "hint": "...",
+      "display_mode": "inline_between",        // optional
+      "between_value": "{n}"                   // required when display_mode="inline_between"
     }
     """
     fields_out = []
@@ -268,6 +300,13 @@ def _build_multi_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
         "fields": fields_out,
         "hint": template.get("hint"),
     }
+
+    # Pass through display_mode + resolved between_value if present
+    if template.get("display_mode"):
+        frontend["display_mode"] = template["display_mode"]
+    if "between_value" in template:
+        frontend["between_value"] = _fill(template["between_value"], params)
+
     grading = {
         "correct_map": correct_map,
     }
@@ -335,8 +374,8 @@ def _build_comparison(template: dict, params: dict) -> tuple[dict, dict]:
 
     frontend = {
         "question": template.get("question", "Comparați numerele:"),
-        "left": left,
-        "right": right,
+        "left": _to_katex(left),  # ← KaTeX for display
+        "right": _to_katex(right),  # ← KaTeX for display
         "options": [
             {"id": "<", "text": "<"},
             {"id": "=", "text": "="},
@@ -344,7 +383,7 @@ def _build_comparison(template: dict, params: dict) -> tuple[dict, dict]:
         ],
     }
     grading = {
-        "left_expr": left,
+        "left_expr": left,  # ← keep Python syntax for SymPy
         "right_expr": right,
     }
     return frontend, grading
@@ -355,12 +394,15 @@ def _build_drag_order(template: dict, params: dict) -> tuple[dict, dict]:
     items_filled = [_fill(item, params) for item in template["items"]]
     direction = template.get("order_direction", "ascending")
 
-    # Determine correct order (numeric sort where possible)
+    # Determine correct order using Python-evaluable form (so 2**40 sorts correctly).
     def sort_key(x: str):
         try:
-            return (0, int(x))
-        except ValueError:
-            return (1, x)
+            return (0, eval(x, {"__builtins__": {}}))
+        except Exception:
+            try:
+                return (0, int(x))
+            except ValueError:
+                return (1, x)
 
     correct_order = sorted(
         items_filled,
@@ -371,20 +413,19 @@ def _build_drag_order(template: dict, params: dict) -> tuple[dict, dict]:
     # Shuffle for display
     display_items = items_filled.copy()
     random.shuffle(display_items)
-    # Re-shuffle until display order differs from correct order
-    # (avoid trivially pre-solved exercises)
     attempts = 0
     while display_items == correct_order and attempts < 10:
         random.shuffle(display_items)
         attempts += 1
 
+    # Convert to KaTeX for display (grading uses original strings).
     frontend = {
         "question": _fill(template.get("question", "Ordonați:"), params),
-        "items": display_items,
+        "items": [_to_katex(item) for item in display_items],
         "order_direction": direction,
     }
     grading = {
-        "correct_order": correct_order,
+        "correct_order": [_to_katex(item) for item in correct_order],
     }
     return frontend, grading
 
