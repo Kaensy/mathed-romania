@@ -11,12 +11,15 @@ Usage:
 Data files live in backend/exercises/ and export an EXERCISES list.
 Each entry specifies the template, difficulty, category, and topic lookup.
 """
+import builtins
 import importlib
 
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.content.models import Exercise, Topic
 
+# Parameter names that collide with Python builtins and cause eval() issues.
+_RESERVED_NAMES = frozenset(dir(builtins))
 
 # All known exercise data modules (used by --all flag)
 ALL_MODULES = [
@@ -159,6 +162,14 @@ class Command(BaseCommand):
                 exercise_type = ex_data["exercise_type"]
                 template = ex_data["template"]
 
+                # ── Validate param names against Python builtins ─────────
+                bad_params = self._check_reserved_params(name, template)
+                if bad_params:
+                    for msg in bad_params:
+                        self.stderr.write(self.style.ERROR(msg))
+                    total_skipped += 1
+                    continue
+
                 # Check for duplicates using the template title (unique per exercise).
                 # Falls back to question string if no title is set.
                 title = template.get("title", "")
@@ -251,3 +262,21 @@ class Command(BaseCommand):
                 )
             )
             return None
+
+    @staticmethod
+    def _check_reserved_params(name: str, template: dict) -> list[str]:
+        """Return error messages for any param keys that shadow Python builtins."""
+        errors = []
+        for key in template.get("params", {}):
+            if key in _RESERVED_NAMES:
+                errors.append(
+                    f"  ✗ Exercise '{name}' uses reserved param name '{key}'"
+                    f" — rename it to avoid eval() collisions"
+                )
+        for key in template.get("distractor_params", {}):
+            if key in _RESERVED_NAMES:
+                errors.append(
+                    f"  ✗ Exercise '{name}' uses reserved distractor_params name '{key}'"
+                    f" — rename it to avoid eval() collisions"
+                )
+        return errors
