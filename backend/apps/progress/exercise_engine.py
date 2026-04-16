@@ -493,6 +493,6 @@ def decode_instance_token(token: str) -> dict:
     Decode and verify a signed instance token.
 
     Returns the payload dict with keys: exercise_id, exercise_type, grading_data.
-    Raises signing.BadSignature if tampered or expired.
+    Raises signing.BadSignature if tampered, signing.SignatureExpired if older than 1 hour.
     """
-    return signing.loads(token, salt=_TOKEN_SALT)
+    return signing.loads(token, salt=_TOKEN_SALT, max_age=3600)

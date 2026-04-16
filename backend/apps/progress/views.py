@@ -14,6 +14,7 @@ Endpoints:
 import uuid
 from collections import defaultdict
 
+from django.core.signing import SignatureExpired
 from django.db.models import Case, Count, IntegerField, When
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -285,6 +286,11 @@ class ExerciseAttemptView(APIView):
         try:
             payload = decode_instance_token(instance_token)
             grading_data = payload.get("grading_data", payload)
+        except SignatureExpired:
+            return Response(
+                {"error": "Exercițiul a expirat. Te rugăm să generezi unul nou.", "expired": True},
+                status=status.HTTP_410_GONE,
+            )
         except Exception:
             return Response({"error": "Token invalid."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -736,6 +742,11 @@ class TestFinishView(APIView):
                 grading_data = payload.get("grading_data", payload)
                 is_correct, correct_answer = grade_attempt(
                     exercise.exercise_type, student_answer, grading_data
+                )
+            except SignatureExpired:
+                return Response(
+                    {"error": "Testul a expirat. Te rugăm să începi unul nou.", "expired": True},
+                    status=status.HTTP_410_GONE,
                 )
             except Exception:
                 is_correct = False
