@@ -550,7 +550,9 @@ function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps)
                   <p className="text-xs text-gray-400 mt-1">
                     Răspunsul tău: <span className="font-mono">
                       {answerRecord?.answer !== undefined
-                        ? String(answerRecord.answer)
+                        ? exercise.display_mode === "digit_click" && exercise.number_string
+                          ? exercise.number_string[parseInt(String(answerRecord.answer), 10)] ?? String(answerRecord.answer)
+                          : String(answerRecord.answer)
                         : "—"}
                     </span>
                   </p>

@@ -315,7 +315,9 @@ export default function ExerciseCard({
             <p className="text-sm text-gray-400 mt-1">
               Răspunsul tău:{" "}
               <span className="font-mono">
-                {typeof answer === "object" && !Array.isArray(answer)
+                {exercise.display_mode === "digit_click" && exercise.number_string && typeof answer === "string"
+                  ? exercise.number_string[parseInt(answer, 10)] ?? String(answer)
+                  : typeof answer === "object" && !Array.isArray(answer)
                   ? Object.entries(answer).map(([k, v]) => `${k}=${v}`).join(", ")
                   : Array.isArray(answer)
                   ? answer.join(", ")
