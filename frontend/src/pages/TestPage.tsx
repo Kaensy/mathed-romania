@@ -102,7 +102,7 @@ export default function TestPage() {
   const allAnswered = answeredCount === totalCount;
 
   if (loading) return <TestSkeleton />;
-  if (error) return <TestError message={error} onRetry={() => navigate(-1)} />;
+  if (error) return <TestError message={error} onRetry={() => navigate("/tests")} />;
   if (result) {
     return (
       <TestResultScreen
@@ -131,7 +131,7 @@ export default function TestPage() {
         <div className="text-center">
           <p className="text-gray-500">Testul nu are exerciții configurate.</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/tests")}
             className="mt-4 text-indigo-600 hover:underline text-sm"
           >
             Înapoi
@@ -150,7 +150,7 @@ export default function TestPage() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/tests")}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -307,29 +307,69 @@ function TestExerciseCard({ exercise, answer, onAnswer, index, total }: TestExer
       <div className="px-6 py-5">
 
         {exercise.exercise_type === "multi_fill_blank" && exercise.fields && (
-          <div className="space-y-3">
-            {exercise.fields.map((field) => (
-              <div key={field.key} className="flex items-center gap-3">
-                <span className="text-gray-700 font-medium w-6 text-right shrink-0">
-                  {field.label} =
-                </span>
-                <input
-                  type="text"
-                  value={((answer as Record<string, string>) ?? {})[field.key] ?? ""}
-                  onChange={(e) =>
-                    onAnswer({
-                      ...((answer as Record<string, string>) ?? {}),
-                      [field.key]: e.target.value,
-                    })
-                  }
-                  placeholder="cifră..."
-                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50
-                    text-gray-800 text-base outline-none focus:border-indigo-400 focus:bg-white
-                    transition-colors"
-                />
-              </div>
-            ))}
-          </div>
+          exercise.display_mode === "inline_between" && exercise.between_value ? (
+            // ── Inline between layout: [ ] < n < [ ] ──
+            <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+              <input
+                type="text"
+                value={((answer as Record<string, string>) ?? {})[exercise.fields[0].key] ?? ""}
+                onChange={(e) =>
+                  onAnswer({
+                    ...((answer as Record<string, string>) ?? {}),
+                    [exercise.fields[0].key]: e.target.value,
+                  })
+                }
+                placeholder="?"
+                className="w-24 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50
+                  text-gray-800 text-lg text-center font-semibold outline-none
+                  focus:border-indigo-400 focus:bg-white transition-colors"
+              />
+              <span className="text-2xl text-gray-400 font-bold">&lt;</span>
+              <span className="text-2xl text-gray-800 font-semibold px-2">
+                <InlineMath text={`$${exercise.between_value}$`} />
+              </span>
+              <span className="text-2xl text-gray-400 font-bold">&lt;</span>
+              <input
+                type="text"
+                value={((answer as Record<string, string>) ?? {})[exercise.fields[1].key] ?? ""}
+                onChange={(e) =>
+                  onAnswer({
+                    ...((answer as Record<string, string>) ?? {}),
+                    [exercise.fields[1].key]: e.target.value,
+                  })
+                }
+                placeholder="?"
+                className="w-24 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50
+                  text-gray-800 text-lg text-center font-semibold outline-none
+                  focus:border-indigo-400 focus:bg-white transition-colors"
+              />
+            </div>
+          ) : (
+            // ── Default stacked layout ──
+            <div className="space-y-3">
+              {exercise.fields.map((field) => (
+                <div key={field.key} className="flex items-center gap-3">
+                  <span className="text-gray-700 font-medium w-6 text-right shrink-0">
+                    {field.label} =
+                  </span>
+                  <input
+                    type="text"
+                    value={((answer as Record<string, string>) ?? {})[field.key] ?? ""}
+                    onChange={(e) =>
+                      onAnswer({
+                        ...((answer as Record<string, string>) ?? {}),
+                        [field.key]: e.target.value,
+                      })
+                    }
+                    placeholder="cifră..."
+                    className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50
+                      text-gray-800 text-base outline-none focus:border-indigo-400 focus:bg-white
+                      transition-colors"
+                  />
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {exercise.exercise_type === "fill_blank" && (
@@ -505,11 +545,11 @@ function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps)
 
           <div className="flex gap-3 mt-6">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/tests")}
               className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600
                 font-medium hover:bg-gray-50 transition-colors text-sm"
             >
-              Înapoi la lecție
+              Înapoi la teste
             </button>
             {!result.passed && (
               <button

@@ -2,7 +2,7 @@
 // ExerciseHubPage.tsx  —  route: /topic/:topicId/exercises
 // ═══════════════════════════════════════════════════════════════════════════
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { ArrowLeft, Lock, Star } from "lucide-react";
 import api from "@/api/client";
 import { CATEGORY_LABELS } from "@/constants/categoryLabels";
@@ -23,12 +23,15 @@ const DIFFICULTY_COLOR: Record<Difficulty, string> = {
 export default function ExerciseHubPage() {
   const { topicId } = useParams<{ topicId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [data, setData] = useState<TopicCategoriesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Back-navigation context — came from exercises overview or lesson
-  const fromExercises = location.state?.from === "/exercises";
+  // Back-navigation: lesson passes { from: "/lesson/123" } via state
+  const backTo = (location.state as { from?: string } | null)?.from ?? "/exercises";
+  const backLabel = backTo.startsWith("/lesson/") ? "Lecție" : "Exerciții";
+
 
   useEffect(() => {
     api
@@ -60,11 +63,11 @@ export default function ExerciseHubPage() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
           <button
-            onClick={() => navigate(fromExercises ? "/exercises" : -1 as any)}
+            onClick={() => navigate(backTo)}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>{fromExercises ? "Exerciții" : "Înapoi"}</span>
+            <span>{backLabel}</span>
           </button>
           <span className="text-gray-300">|</span>
           <span className="text-sm font-medium text-gray-700 truncate">{data.topic_title}</span>
@@ -84,6 +87,7 @@ export default function ExerciseHubPage() {
               key={cat.category}
               category={cat}
               topicId={topicId!}
+              origin={backTo}
             />
           ))}
         </div>
@@ -95,16 +99,18 @@ export default function ExerciseHubPage() {
 function CategoryCard({
   category,
   topicId,
+  origin,
 }: {
   category: CategoryInfo;
   topicId: string;
+  origin: string;
 }) {
   const navigate = useNavigate();
   const label = CATEGORY_LABELS[category.category] ?? category.category;
 
   const startPractice = (difficulty: Difficulty) => {
     navigate(`/topic/${topicId}/practice`, {
-      state: { category: category.category, difficulty },
+      state: { category: category.category, difficulty, from: origin },
     });
   };
 

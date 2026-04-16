@@ -35,8 +35,14 @@ export default function PracticePage() {
   const location = useLocation();
 
   // Category and difficulty come from navigation state (set by ExerciseHubPage)
-  const category = (location.state as any)?.category as string | null ?? null;
-  const difficulty = (location.state as any)?.difficulty as Difficulty | null ?? null;
+  const navState = location.state as { category?: string; difficulty?: Difficulty; from?: string } | null;
+  const category = navState?.category ?? null;
+  const difficulty = navState?.difficulty ?? null;
+  const origin = navState?.from;
+
+  /** Navigate back to ExerciseHubPage, preserving the origin chain. */
+  const goBackToHub = () =>
+    navigate(`/topic/${topicId}/exercises`, { state: origin ? { from: origin } : undefined });
 
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -114,7 +120,7 @@ export default function PracticePage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 font-medium">{error}</p>
-          <button onClick={() => navigate(-1)} className="mt-4 text-indigo-600 hover:underline text-sm">
+          <button onClick={goBackToHub} className="mt-4 text-indigo-600 hover:underline text-sm">
             Înapoi
           </button>
         </div>
@@ -136,6 +142,7 @@ export default function PracticePage() {
         onRestart={handleRestart}
         topicId={topicId!}
         category={category}
+        origin={origin}
       />
     );
   }
@@ -149,7 +156,7 @@ export default function PracticePage() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
           <button
-            onClick={() => navigate(`/topic/${topicId}/exercises`)}
+            onClick={goBackToHub}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -199,6 +206,7 @@ interface CompletionScreenProps {
   onRestart: () => void;
   topicId: string;
   category: string | null;
+  origin?: string;
 }
 
 function CompletionScreen({
@@ -209,6 +217,7 @@ function CompletionScreen({
   onRestart,
   topicId,
   category,
+  origin,
 }: CompletionScreenProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -248,6 +257,7 @@ function CompletionScreen({
           </button>
           <Link
             to={`/topic/${topicId}/exercises`}
+            state={origin ? { from: origin } : undefined}
             className="w-full py-3 border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors block"
           >
             Înapoi la exerciții
