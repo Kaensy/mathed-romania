@@ -11,6 +11,7 @@ Endpoints:
   GET  /api/v1/progress/tests-overview/             — all topic tests
   GET  /api/v1/progress/dashboard/                  — student dashboard stats
 """
+import logging
 import uuid
 from collections import defaultdict
 from datetime import timedelta
@@ -29,9 +30,18 @@ from apps.progress.models import (
     CategoryProgress,
     ExerciseAttempt,
     LessonProgress,
+    Streak,
+    StreakActivity,
     TestAttempt,
 )
-from apps.progress.serializers import AttemptSubmitSerializer, DashboardSerializer
+from apps.progress.serializers import (
+    AttemptSubmitSerializer,
+    DashboardSerializer,
+    StreakSerializer,
+)
+from apps.progress.streak_service import _today_local, record_activity
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Lesson open ──────────────────────────────────────────────────────────────
@@ -56,6 +66,12 @@ class LessonOpenView(APIView):
             lesson=lesson,
             defaults={"status": LessonProgress.Status.IN_PROGRESS},
         )
+
+        if created:
+            try:
+                record_activity(request.user, "lesson")
+            except Exception:
+                logger.warning("Streak update failed", exc_info=True)
 
         if not created and progress.status == LessonProgress.Status.NOT_STARTED:
             progress.status = LessonProgress.Status.IN_PROGRESS
@@ -349,6 +365,11 @@ class ExerciseAttemptView(APIView):
             is_correct=is_correct,
             session_id=session_id,
         )
+
+        try:
+            record_activity(request.user, "exercise")
+        except Exception:
+            logger.warning("Streak update failed", exc_info=True)
 
         # ── Hint counter update ──────────────────────────────────────
         if not is_correct and session_id and exercise.category:
@@ -714,6 +735,39 @@ class DashboardView(APIView):
         })
 
 
+# ─── Streak ───────────────────────────────────────────────────────────────────
+
+class StreakView(APIView):
+    """
+    GET /api/v1/progress/streak/
+
+    Returns the authenticated student's streak stats and activity
+    history for the calendar heatmap.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        streak, _ = Streak.objects.get_or_create(student=request.user)
+
+        cutoff = _today_local() - timedelta(days=365)
+        active_dates = list(
+            StreakActivity.objects
+            .filter(student=request.user, date__gte=cutoff)
+            .order_by("date")
+            .values_list("date", flat=True)
+        )
+
+        data = {
+            "current_streak": streak.current_streak,
+            "longest_streak": streak.longest_streak,
+            "freeze_count": streak.freeze_count,
+            "active_dates": active_dates,
+        }
+
+        serializer = StreakSerializer(data)
+        return Response(serializer.data)
+
+
 # ─── Test session views ───────────────────────────────────────────────────────
 
 class TestStartView(APIView):
@@ -855,6 +909,12 @@ class TestFinishView(APIView):
         attempt.status = TestAttempt.Status.COMPLETED
         attempt.finished_at = timezone.now()
         attempt.save()
+
+        try:
+            act_type = "topic_test" if test.scope == "topic" else "unit_test"
+            record_activity(request.user, act_type)
+        except Exception:
+            logger.warning("Streak update failed", exc_info=True)
 
         return Response({
             "attempt_id": attempt.id,

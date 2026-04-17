@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import CategoryProgress, ClassroomPace, ExerciseAttempt, LessonProgress, Streak, TestAttempt
+from .models import (
+    CategoryProgress,
+    ClassroomPace,
+    ExerciseAttempt,
+    LessonProgress,
+    Streak,
+    StreakActivity,
+    TestAttempt,
+)
 
 
 @admin.register(LessonProgress)
@@ -34,4 +42,10 @@ class ClassroomPaceAdmin(admin.ModelAdmin):
 
 @admin.register(Streak)
 class StreakAdmin(admin.ModelAdmin):
-    list_display = ("student", "current_streak", "longest_streak", "last_active_date")
+    list_display = ("student", "current_streak", "longest_streak", "last_active_date", "freeze_count")
+
+
+@admin.register(StreakActivity)
+class StreakActivityAdmin(admin.ModelAdmin):
+    list_display = ("student", "date", "activity_type")
+    list_filter = ("activity_type",)

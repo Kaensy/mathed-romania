@@ -178,3 +178,12 @@ export interface TopicTestSummary {
 export interface TestsOverviewResponse {
   tests: TopicTestSummary[];
 }
+
+// ─── Streak ───────────────────────────────────────────────────────────────────
+
+export interface StreakData {
+  current_streak: number;
+  longest_streak: number;
+  freeze_count: number;
+  active_dates: string[];  // ISO date strings "YYYY-MM-DD"
+}

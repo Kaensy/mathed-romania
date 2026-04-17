@@ -34,3 +34,14 @@ class DashboardSerializer(serializers.Serializer):
     exercises_attempted = serializers.IntegerField()
     perfect_batches = serializers.IntegerField()
     units = serializers.ListField(child=serializers.DictField())
+
+
+class StreakSerializer(serializers.Serializer):
+    """Read-only streak data for the dashboard and streak modal."""
+    current_streak = serializers.IntegerField()
+    longest_streak = serializers.IntegerField()
+    freeze_count = serializers.IntegerField()
+    active_dates = serializers.ListField(
+        child=serializers.DateField(),
+        help_text="Dates the student was active, for calendar heatmap",
+    )

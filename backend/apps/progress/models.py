@@ -201,9 +201,41 @@ class Streak(models.Model):
     current_streak = models.PositiveIntegerField(default=0)
     longest_streak = models.PositiveIntegerField(default=0)
     last_active_date = models.DateField(null=True, blank=True)
+    freeze_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Stockpiled streak freezes. Max 2. Earned 1 per 7 consecutive active days.",
+    )
 
     class Meta:
         db_table = "streaks"
 
     def __str__(self):
         return f"{self.student.email} — streak: {self.current_streak}"
+
+
+class StreakActivity(models.Model):
+    """One row per student per day they were active. Drives streak calculation."""
+
+    class ActivityType(models.TextChoices):
+        EXERCISE = "exercise", "Exercise"
+        LESSON = "lesson", "Lesson"
+        TOPIC_TEST = "topic_test", "Topic Test"
+        UNIT_TEST = "unit_test", "Unit Test"
+        DAILY_TEST = "daily_test", "Daily Test"
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="streak_activities",
+        limit_choices_to={"user_type": "student"},
+    )
+    date = models.DateField()
+    activity_type = models.CharField(max_length=20, choices=ActivityType.choices)
+
+    class Meta:
+        db_table = "streak_activities"
+        unique_together = [("student", "date")]
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.student.email} — {self.date} ({self.activity_type})"

@@ -4,12 +4,17 @@ import { useNavigate, Link } from "react-router-dom";
 import { BookOpen, PenLine, BarChart3 } from "lucide-react";
 import api from "@/api/client";
 import type { DashboardStats } from "@/types/progress";
+import { useStreak } from "@/hooks/useStreak";
+import StreakBadge from "@/components/streak/StreakBadge";
+import StreakModal from "@/components/streak/StreakModal";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
+  const { streak, loading: loadingStreak } = useStreak();
 
   useEffect(() => {
     api
@@ -37,6 +42,12 @@ export default function DashboardPage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <h1 className="text-lg font-bold text-indigo-900">MathEd Romania</h1>
           <div className="flex items-center gap-4">
+            {user.user_type === "student" && !loadingStreak && streak && (
+              <StreakBadge
+                count={streak.current_streak}
+                onClick={() => setStreakModalOpen(true)}
+              />
+            )}
             <span className="text-sm text-gray-600">
               {user.first_name} {user.last_name}
             </span>
@@ -141,6 +152,10 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {streakModalOpen && streak && (
+        <StreakModal streak={streak} onClose={() => setStreakModalOpen(false)} />
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ from .views import (
     HintUsedView,
     LessonCompleteView,
     LessonOpenView,
+    StreakView,
     TestsOverviewView,
     TestStartView,
     TestAnswerView,
@@ -43,4 +44,7 @@ urlpatterns = [
 
     # Dashboard
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
+
+    # Streak
+    path("streak/", StreakView.as_view(), name="streak"),
 ]
