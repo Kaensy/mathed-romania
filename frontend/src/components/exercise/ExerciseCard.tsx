@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle, XCircle, ChevronRight, Trophy } from "lucide-react";
 import api from "@/api/client";
 import { InlineMath } from "@/lib/math";
-import type { AttemptResult, Difficulty, ExerciseInstance } from "@/types/progress";
+import type { AttemptResult, ExerciseInstance, TierCleared } from "@/types/progress";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -23,11 +23,15 @@ export interface ExerciseCardProps {
     isCorrect: boolean,
     exercise: ExerciseInstance,
     answer: string | string[] | Record<string, string>,
-    tierCleared: Difficulty | null,
+    tierCleared: TierCleared | null,
+    hintActiveForCategory: string | null,
   ) => void;
   onNext: () => void;
   isLast: boolean;
   previewMode?: boolean;
+  hintActiveForThisCategory?: boolean;
+  topicId?: number;
+  onHintUsed?: (category: string) => void;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -39,6 +43,9 @@ export default function ExerciseCard({
   onNext,
   isLast,
   previewMode = false,
+  hintActiveForThisCategory = false,
+  topicId,
+  onHintUsed,
 }: ExerciseCardProps) {
   const initAnswer = (): string | string[] | Record<string, string> => {
     if (exercise.exercise_type === "drag_order") {
@@ -64,6 +71,9 @@ export default function ExerciseCard({
   const [followUpResult, setFollowUpResult] = useState<"pending" | "correct" | "incorrect">("pending");
   const followUpRef = useRef<HTMLInputElement>(null);
 
+  // ── Hint state ──────────────────────────────────────────────────────────
+  const [hintRevealed, setHintRevealed] = useState(false);
+
   useEffect(() => {
     if (!result) inputRef.current?.focus();
   }, [result]);
@@ -74,6 +84,15 @@ export default function ExerciseCard({
       followUpRef.current?.focus();
     }
   }, [result, followUpResult]);
+
+  // Reset state when exercise changes (safety net for non-keyed remounts)
+  useEffect(() => {
+    setAnswer(initAnswer());
+    setResult(null);
+    setFollowUpAnswer("");
+    setFollowUpResult("pending");
+    setHintRevealed(false);
+  }, [exercise.instance_token]);
 
   const isAnswerEmpty = (): boolean => {
     if (typeof answer === "string") return answer.trim() === "";
@@ -103,6 +122,7 @@ export default function ExerciseCard({
         exercise,
         typeof answer === "string" ? answer.trim() : answer,
         res.data.tier_cleared ?? null,
+        res.data.hint_active_for_category ?? null,
       );
     } catch {
       setResult({ is_correct: false, correct_answer: null, tier_cleared: null, error: "Eroare de rețea." });
@@ -121,6 +141,22 @@ export default function ExerciseCard({
       setFollowUpResult("correct");
     } else {
       setFollowUpResult("incorrect");
+    }
+  };
+
+  const revealHint = () => {
+    if (hintRevealed || !exercise.hint) return;
+    setHintRevealed(true);
+    // Notify backend to reset counter — fire-and-forget.
+    // Skip the call if topicId or category is missing (e.g., preview mode).
+    if (topicId && exercise.category) {
+      api.post("/progress/categories/hint-used/", {
+        topic_id: topicId,
+        category: exercise.category,
+      }).catch(() => {});
+    }
+    if (exercise.category) {
+      onHintUsed?.(exercise.category);
     }
   };
 
@@ -147,6 +183,24 @@ export default function ExerciseCard({
       <div className="text-lg font-medium text-gray-800 mb-6 leading-relaxed">
         <InlineMath text={exercise.question} />
       </div>
+
+      {/* Hint button */}
+      {!result && !hintRevealed && exercise.hint && (hintActiveForThisCategory || previewMode) && (
+        <button
+          onClick={revealHint}
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-3 py-1.5 font-medium transition-colors"
+        >
+          💡 Indiciu
+        </button>
+      )}
+
+      {/* Revealed hint */}
+      {hintRevealed && exercise.hint && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 text-sm flex gap-2">
+          <span aria-hidden>💡</span>
+          <div className="flex-1"><InlineMath text={exercise.hint} /></div>
+        </div>
+      )}
 
       {/* Input area */}
       {!result && (

@@ -98,6 +98,15 @@ class CategoryProgress(models.Model):
     easy_cleared = models.BooleanField(default=False)
     medium_cleared = models.BooleanField(default=False)
     hard_cleared = models.BooleanField(default=False)
+    category_failure_count = models.PositiveIntegerField(
+        default=0,
+        help_text="First-wrong-in-batch counter per category. Resets when hint is used.",
+    )
+    last_failure_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of last counted failure. Used for 7-day sliding window reset.",
+    )
 
     class Meta:
         db_table = "category_progress"

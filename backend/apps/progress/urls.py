@@ -5,6 +5,7 @@ from .views import (
     ExerciseAttemptView,
     ExercisesOverviewView,
     ExercisePreviewInstanceView,
+    HintUsedView,
     LessonCompleteView,
     LessonOpenView,
     TestsOverviewView,
@@ -25,8 +26,9 @@ urlpatterns = [
     path("topics/<int:topic_id>/practice/", TopicPracticeView.as_view(), name="topic_practice"),
     path("topics/<int:topic_id>/categories/", TopicCategoriesView.as_view(), name="topic_categories"),
 
-    # Exercise attempt submission
+    # Exercise attempt submission & hint tracking
     path("exercises/attempt/", ExerciseAttemptView.as_view(), name="exercise_attempt"),
+    path("categories/hint-used/", HintUsedView.as_view(), name="hint-used"),
     path("exercises/<int:exercise_id>/preview-instance/", ExercisePreviewInstanceView.as_view(), name="exercise_preview_instance"),
 
     # Overview pages

@@ -13,6 +13,7 @@ Endpoints:
 """
 import uuid
 from collections import defaultdict
+from datetime import timedelta
 
 from django.core.signing import SignatureExpired
 from django.db.models import Case, Count, IntegerField, When
@@ -156,11 +157,20 @@ class TopicPracticeView(APIView):
             except Exception as e:
                 continue
 
+        hint_active_categories = list(
+            CategoryProgress.objects.filter(
+                student=request.user,
+                topic=topic,
+                category_failure_count__gte=2,
+            ).values_list("category", flat=True)
+        )
+
         return Response({
             "topic_id": topic_id,
             "session_id": session_id,
             "exercises": instances,
             "practice_minimum": topic.practice_minimum,
+            "hint_active_categories": hint_active_categories,
         })
 
 
@@ -328,6 +338,7 @@ class ExerciseAttemptView(APIView):
                 "correct_answer": correct_display,
                 "follow_up": follow_up,
                 "tier_cleared": None,
+                "hint_active_for_category": None,
                 "error": error if not is_correct else None,
             })
 
@@ -339,6 +350,41 @@ class ExerciseAttemptView(APIView):
             session_id=session_id,
         )
 
+        # ── Hint counter update ──────────────────────────────────────
+        if not is_correct and session_id and exercise.category:
+            prior_wrong = ExerciseAttempt.objects.filter(
+                student=request.user,
+                session_id=session_id,
+                exercise__category=exercise.category,
+                is_correct=False,
+            ).count()
+            # prior_wrong includes the attempt we just created; "first wrong"
+            # means exactly 1 wrong attempt exists for this batch+category.
+            if prior_wrong == 1:
+                now = timezone.now()
+                cp, _ = CategoryProgress.objects.get_or_create(
+                    student=request.user,
+                    topic=exercise.topic,
+                    category=exercise.category,
+                )
+                if cp.last_failure_at is None or now - cp.last_failure_at > timedelta(days=7):
+                    cp.category_failure_count = 1
+                else:
+                    cp.category_failure_count += 1
+                cp.last_failure_at = now
+                cp.save(update_fields=["category_failure_count", "last_failure_at"])
+
+        # ── Determine hint_active_for_category ───────────────────────
+        hint_active_for_category = None
+        if exercise.category:
+            cp = CategoryProgress.objects.filter(
+                student=request.user,
+                topic=exercise.topic,
+                category=exercise.category,
+            ).first()
+            if cp and cp.category_failure_count >= 2:
+                hint_active_for_category = exercise.category
+
         tier_cleared = None
         if session_id:
             tier_cleared = self._check_tier_cleared(request.user, session_id, exercise)
@@ -349,7 +395,8 @@ class ExerciseAttemptView(APIView):
             "is_correct": is_correct,
             "correct_answer": correct_display,
             "follow_up": follow_up,
-            "tier_cleared": None,
+            "tier_cleared": tier_cleared,
+            "hint_active_for_category": hint_active_for_category,
             "error": error if not is_correct else None,
         })
 
@@ -373,21 +420,58 @@ class ExerciseAttemptView(APIView):
         if difficulty == "easy" and not cp.easy_cleared:
             cp.easy_cleared = True
             cp.save(update_fields=["easy_cleared"])
-            return "easy"
+            return {"tier": "easy", "also_cleared": []}
         elif difficulty == "medium" and not cp.medium_cleared:
             cp.medium_cleared = True
             cp.save(update_fields=["medium_cleared"])
-            return "medium"
+            return {"tier": "medium", "also_cleared": []}
         elif difficulty == "hard" and not cp.hard_cleared:
             cp.hard_cleared = True
+            also_cleared = []
             if not cp.medium_cleared:
                 cp.medium_cleared = True
+                also_cleared.append("medium")
                 cp.save(update_fields=["hard_cleared", "medium_cleared"])
             else:
                 cp.save(update_fields=["hard_cleared"])
-            return "hard"
+            return {"tier": "hard", "also_cleared": also_cleared}
 
         return None
+
+
+# ─── Hint used ───────────────────────────────────────────────────────────────
+
+class HintUsedView(APIView):
+    """
+    POST /api/v1/progress/categories/hint-used/
+
+    Called when a student uses a hint. Resets the failure counter
+    for the given (student, topic, category).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        topic_id = request.data.get("topic_id")
+        category = request.data.get("category")
+
+        if (
+            not isinstance(topic_id, int)
+            or topic_id <= 0
+            or not isinstance(category, str)
+            or not category
+        ):
+            return Response(
+                {"error": "topic_id și category sunt obligatorii."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        updated = CategoryProgress.objects.filter(
+            student=request.user,
+            topic_id=topic_id,
+            category=category,
+        ).update(category_failure_count=0)
+
+        return Response({"reset": updated > 0})
 
 
 # ─── Exercises overview ───────────────────────────────────────────────────────

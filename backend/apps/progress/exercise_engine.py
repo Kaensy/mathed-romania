@@ -477,6 +477,7 @@ def generate_instance(exercise) -> dict:
         "exercise_id": exercise.id,
         "exercise_type": exercise_type,
         "difficulty": exercise.difficulty,
+        "category": exercise.category,
         "instance_token": instance_token,
         **frontend_data,
     }

@@ -12,12 +12,13 @@
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
-import { ArrowLeft, Trophy, RotateCcw, Star } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Trophy, RotateCcw, Star, Unlock } from "lucide-react";
 import api from "@/api/client";
 import type {
   Difficulty,
   ExerciseInstance,
   PracticeSession,
+  TierCleared,
 } from "@/types/progress";
 import ExerciseCard from "@/components/exercise/ExerciseCard";
 
@@ -56,7 +57,8 @@ export default function PracticePage() {
     answer: string | string[];
   }[]>([]);
 
-  const [tierCleared, setTierCleared] = useState<Difficulty | null>(null);
+  const [tierCleared, setTierCleared] = useState<TierCleared | null>(null);
+  const [activeHintCategories, setActiveHintCategories] = useState<Set<string>>(new Set());
 
   const fetchSession = () => {
     if (!topicId) return;
@@ -69,7 +71,10 @@ export default function PracticePage() {
 
     api
       .get<PracticeSession>(`/progress/topics/${topicId}/practice/?${params}`)
-      .then((res) => setSession(res.data))
+      .then((res) => {
+        setSession(res.data);
+        setActiveHintCategories(new Set(res.data.hint_active_categories ?? []));
+      })
       .catch(() => setError("Nu am putut încărca exercițiile. Încearcă din nou."))
       .finally(() => setLoading(false));
   };
@@ -82,11 +87,15 @@ export default function PracticePage() {
     isCorrect: boolean,
     exercise: ExerciseInstance,
     answer: string | string[] | Record<string, string>,
-    tierClearedFromAttempt: Difficulty | null,
+    tierClearedFromAttempt: TierCleared | null,
+    hintActiveForCategory: string | null,
   ) => {
     setQuestionResults((prev) => [...prev, { exercise, is_correct: isCorrect, answer }]);
     if (tierClearedFromAttempt) {
       setTierCleared(tierClearedFromAttempt);
+    }
+    if (hintActiveForCategory) {
+      setActiveHintCategories((prev) => new Set(prev).add(hintActiveForCategory));
     }
   };
 
@@ -104,7 +113,16 @@ export default function PracticePage() {
     setQuestionResults([]);
     setFinished(false);
     setTierCleared(null);
+    setActiveHintCategories(new Set());
     fetchSession();
+  };
+
+  const handleHintUsed = (category: string) => {
+    setActiveHintCategories((prev) => {
+      const next = new Set(prev);
+      next.delete(category);
+      return next;
+    });
   };
 
   if (loading) {
@@ -189,6 +207,9 @@ export default function PracticePage() {
           onResult={handleAnswerResult}
           onNext={handleNext}
           isLast={currentIndex === session.exercises.length - 1}
+          hintActiveForThisCategory={activeHintCategories.has(currentExercise.category ?? "")}
+          topicId={Number(topicId)}
+          onHintUsed={handleHintUsed}
         />
       </main>
     </div>
@@ -202,7 +223,7 @@ interface CompletionScreenProps {
   correctCount: number;
   total: number;
   isPerfect: boolean;
-  tierCleared: Difficulty | null;
+  tierCleared: TierCleared | null;
   onRestart: () => void;
   topicId: string;
   category: string | null;
@@ -239,11 +260,42 @@ function CompletionScreen({
         </p>
 
         {tierCleared && (
-          <div className="mb-6 flex items-center gap-2 justify-center bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
-            <span className="font-semibold text-amber-800">
-              Nivel {DIFFICULTY_LABEL[tierCleared]} deblocat!
-            </span>
+          <div className="mb-6 flex items-start gap-2 justify-center bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            {tierCleared.tier === "easy" && (
+              <>
+                <Unlock className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-semibold text-amber-800">
+                    Felicitări! Ai deblocat nivelurile Mediu și Greu.
+                  </span>
+                </div>
+              </>
+            )}
+            {tierCleared.tier === "medium" && (
+              <>
+                <CheckCircle2 className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-semibold text-amber-800">
+                    Ai trecut de categorie! Poți încerca și nivelul Greu pentru a o stăpâni complet.
+                  </span>
+                </div>
+              </>
+            )}
+            {tierCleared.tier === "hard" && (
+              <>
+                <Star className="w-5 h-5 text-amber-500 fill-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-semibold text-amber-800">
+                    Ai stăpânit categoria! Performanță de vârf pe nivelul Greu.
+                  </span>
+                  {tierCleared.also_cleared.includes("medium") && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      (Nivelul Mediu a fost completat automat.)
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 

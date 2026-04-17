@@ -50,6 +50,9 @@ export interface ExerciseInstance {
   // drag_order
   items?: string[];
   order_direction?: "ascending" | "descending";
+
+  // category (used for hint tracking)
+  category?: string;
 }
 
 // ─── Practice session ─────────────────────────────────────────────────────────
@@ -59,6 +62,7 @@ export interface PracticeSession {
   session_id: string;
   exercises: ExerciseInstance[];
   practice_minimum: number;
+  hint_active_categories: string[];
 }
 
 // ─── Attempt submission ───────────────────────────────────────────────────────
@@ -75,11 +79,17 @@ export interface FollowUp {
     expected: string;
 }
 
+export interface TierCleared {
+  tier: Difficulty;
+  also_cleared: Difficulty[];
+}
+
 export interface AttemptResult {
     is_correct: boolean;
     correct_answer: string | null;
     follow_up?: FollowUp | null;
-    tier_cleared: Difficulty | null;
+    tier_cleared: TierCleared | null;
+    hint_active_for_category?: string | null;
     error: string | null;
   }
 
