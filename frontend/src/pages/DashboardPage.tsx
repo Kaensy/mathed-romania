@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
-import { BookOpen, PenLine, BarChart3 } from "lucide-react";
+import { BookOpen, PenLine, BarChart3, Flame, CheckCircle2 } from "lucide-react";
 import api from "@/api/client";
 import type { DashboardStats } from "@/types/progress";
+import type { DailyTestResponse } from "@/types/daily";
 import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
@@ -102,6 +103,9 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Daily test widget */}
+        {user.user_type === "student" && <DailyTestCard />}
+
         {/* Navigation cards */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link
@@ -158,6 +162,145 @@ export default function DashboardPage() {
       )}
     </div>
   );
+}
+
+function DailyTestCard() {
+  const [state, setState] = useState<DailyTestResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<DailyTestResponse>("/progress/daily/")
+      .then((res) => setState(res.data))
+      .catch(() => {/* non-fatal — hide card */})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="mt-8 rounded-xl border bg-white p-5 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-gray-200 shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-gray-200 rounded w-32" />
+            <div className="h-3 bg-gray-100 rounded w-48" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!state) return null;
+
+  if (state.status === "no_exercises") {
+    return (
+      <div className="mt-8 rounded-xl border bg-white p-5 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+          <Flame className="w-6 h-6 text-gray-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-700">Testul Zilei</h3>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Rezolvă exerciții pentru a debloca testul zilei.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.status === "available") {
+    return (
+      <Link
+        to="/daily"
+        className="mt-8 block rounded-xl border-2 border-orange-200 bg-gradient-to-br
+          from-orange-50 to-white p-5 hover:border-orange-400 hover:shadow-sm transition-all"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+            <Flame className="w-6 h-6 text-orange-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900">Testul Zilei</h3>
+            <p className="text-sm text-gray-600 mt-0.5">
+              {state.exercise_count} {state.exercise_count === 1 ? "exercițiu" : "exerciții"} te așteaptă astăzi.
+            </p>
+          </div>
+          <span className="shrink-0 px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold">
+            Începe
+          </span>
+        </div>
+      </Link>
+    );
+  }
+
+  if (state.status === "in_progress") {
+    const cta = state.completed_count === 0 ? "Începe" : "Continuă";
+    const pct = state.total_count > 0
+      ? (state.completed_count / state.total_count) * 100
+      : 0;
+    return (
+      <Link
+        to="/daily"
+        className="mt-8 block rounded-xl border-2 border-indigo-200 bg-gradient-to-br
+          from-indigo-50 to-white p-5 hover:border-indigo-400 hover:shadow-sm transition-all"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+            <Flame className="w-6 h-6 text-orange-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900">Testul Zilei</h3>
+            <p className="text-sm text-gray-600 mt-0.5">
+              {state.completed_count}/{state.total_count} completate
+            </p>
+            <div className="h-1.5 mt-2 bg-white/80 rounded-full overflow-hidden">
+              <div
+                className="h-1.5 bg-indigo-500 rounded-full transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+          <span className="shrink-0 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold">
+            {cta}
+          </span>
+        </div>
+      </Link>
+    );
+  }
+
+  // completed
+  const timeLabel = formatShortTime(state.completed_at);
+  return (
+    <div className="mt-8 rounded-xl border border-green-200 bg-green-50/60 p-5 flex items-center gap-4">
+      <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+        <CheckCircle2 className="w-6 h-6 text-green-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-gray-900">Testul Zilei</h3>
+        <p className="text-sm text-green-700 mt-0.5">
+          Completat ✓
+          {timeLabel && <span className="text-gray-400"> • la {timeLabel}</span>}
+        </p>
+      </div>
+      <Link
+        to="/daily"
+        className="shrink-0 text-sm text-indigo-600 hover:underline"
+      >
+        Vezi rezultatele
+      </Link>
+    </div>
+  );
+}
+
+function formatShortTime(iso: string): string | null {
+  try {
+    return new Date(iso).toLocaleTimeString("ro-RO", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return null;
+  }
 }
 
 function StatCard({

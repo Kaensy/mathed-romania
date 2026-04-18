@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     CategoryProgress,
     ClassroomPace,
+    DailyTestSession,
     ExerciseAttempt,
     LessonProgress,
     Streak,
@@ -49,3 +50,10 @@ class StreakAdmin(admin.ModelAdmin):
 class StreakActivityAdmin(admin.ModelAdmin):
     list_display = ("student", "date", "activity_type")
     list_filter = ("activity_type",)
+
+
+@admin.register(DailyTestSession)
+class DailyTestSessionAdmin(admin.ModelAdmin):
+    list_display = ("student", "date", "is_completed", "completed_at")
+    list_filter = ("is_completed", "date")
+    readonly_fields = ("exercise_instances", "completed_indices", "completed_at", "created_at")

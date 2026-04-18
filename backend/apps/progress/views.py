@@ -29,6 +29,7 @@ from apps.progress.grading import grade_attempt
 from apps.progress.unlock import get_passed_test_ids, get_test_unlock_map, is_test_unlocked
 from apps.progress.models import (
     CategoryProgress,
+    DailyTestSession,
     ExerciseAttempt,
     LessonProgress,
     Streak,
@@ -799,6 +800,320 @@ class StreakView(APIView):
 
         serializer = StreakSerializer(data)
         return Response(serializer.data)
+
+
+# ─── Daily test ───────────────────────────────────────────────────────────────
+
+def _eligible_daily_categories(student) -> list[str]:
+    """Categories the student can draw a daily test from.
+
+    Sourced from topics with at least one opened lesson. Prefers medium-
+    difficulty categories; falls back to any-difficulty if none exist.
+    Caller decides what to do with an empty result.
+    """
+    opened_topic_ids = list(
+        LessonProgress.objects
+        .filter(student=student)
+        .values_list("lesson__topic_id", flat=True)
+        .distinct()
+    )
+
+    categories = [
+        c for c in (
+            Exercise.objects
+            .filter(
+                topic_id__in=opened_topic_ids,
+                is_active=True,
+                difficulty="medium",
+            )
+            .values_list("category", flat=True)
+            .distinct()
+        ) if c
+    ]
+    if categories:
+        return categories
+
+    return [
+        c for c in (
+            Exercise.objects
+            .filter(topic_id__in=opened_topic_ids, is_active=True)
+            .values_list("category", flat=True)
+            .distinct()
+        ) if c
+    ]
+
+
+def _serialize_session(session: DailyTestSession) -> dict:
+    """Serialize a DailyTestSession into the in_progress or completed shape."""
+    total = len(session.exercise_instances)
+    completed_count = len(session.completed_indices)
+
+    if session.is_completed:
+        exercises_with_index = [
+            {**instance, "index": idx}
+            for idx, instance in enumerate(session.exercise_instances)
+        ]
+        return {
+            "status": "completed",
+            "completed_at": session.completed_at,
+            "exercise_count": total,
+            "completed_count": completed_count,
+            "exercises": exercises_with_index,
+            "completed_indices": list(session.completed_indices),
+            "answers": dict(session.answers or {}),
+        }
+
+    completed_set = set(session.completed_indices)
+    pending = [
+        {**instance, "index": idx}
+        for idx, instance in enumerate(session.exercise_instances)
+        if idx not in completed_set
+    ]
+    return {
+        "status": "in_progress",
+        "exercises": pending,
+        "completed_count": completed_count,
+        "total_count": total,
+    }
+
+
+class DailyTestView(APIView):
+    """
+    GET /api/v1/progress/daily/
+
+    Read-only status check. Returns the existing session if one was
+    started today, otherwise reports whether a new test is available
+    based on the student's eligible category pool. Does NOT create
+    a session — start it with POST /daily/start/.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        today = _today_local()
+        session = DailyTestSession.objects.filter(
+            student=request.user, date=today
+        ).first()
+
+        if session is not None:
+            return Response(_serialize_session(session))
+
+        categories = _eligible_daily_categories(request.user)
+        if not categories:
+            return Response({
+                "status": "no_exercises",
+                "message": (
+                    "Deschide câteva lecții și exersează puțin înainte de "
+                    "a primi un test zilnic."
+                ),
+            })
+
+        return Response({
+            "status": "available",
+            "exercise_count": 5,
+        })
+
+
+class DailyTestStartView(APIView):
+    """
+    POST /api/v1/progress/daily/start/
+
+    Creates today's DailyTestSession if one doesn't already exist, then
+    returns the session state. Idempotent — re-calling just returns the
+    existing session.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        import random
+
+        today = _today_local()
+        session = DailyTestSession.objects.filter(
+            student=request.user, date=today
+        ).first()
+
+        if session is not None:
+            return Response(_serialize_session(session))
+
+        categories = _eligible_daily_categories(request.user)
+        if not categories:
+            return Response({
+                "status": "no_exercises",
+                "message": (
+                    "Deschide câteva lecții și exersează puțin înainte de "
+                    "a primi un test zilnic."
+                ),
+            })
+
+        shuffled = random.sample(categories, len(categories))
+        slot_categories = list(shuffled[:5])
+        while len(slot_categories) < 5:
+            slot_categories.append(shuffled[len(slot_categories) % len(shuffled)])
+
+        instances: list[dict] = []
+        for cat in slot_categories:
+            ex = (
+                Exercise.objects
+                .filter(category=cat, difficulty="medium", is_active=True)
+                .order_by("?")
+                .first()
+            )
+            if ex is None:
+                ex = (
+                    Exercise.objects
+                    .filter(category=cat, difficulty="easy", is_active=True)
+                    .order_by("?")
+                    .first()
+                )
+            if ex is None:
+                continue
+            try:
+                instance = generate_instance(ex)
+                instance["exercise_id"] = ex.id
+                instances.append(instance)
+            except Exception:
+                continue
+
+        if not instances:
+            return Response({
+                "status": "no_exercises",
+                "message": (
+                    "Nu există exerciții disponibile pentru testul zilnic de azi."
+                ),
+            })
+
+        session = DailyTestSession.objects.create(
+            student=request.user,
+            date=today,
+            exercise_instances=instances,
+            completed_indices=[],
+        )
+
+        return Response(_serialize_session(session))
+
+
+class DailyTestSubmitView(APIView):
+    """
+    POST /api/v1/progress/daily/submit/
+
+    Body: {"answers": {"0": <answer>, "3": <answer>}}
+
+    Grades each submitted answer. Correct indices are marked complete;
+    wrong (or expired) slots have their instance regenerated with fresh
+    params so the student can retry.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        today = _today_local()
+        session = DailyTestSession.objects.filter(
+            student=request.user, date=today
+        ).first()
+
+        if session is None:
+            return Response(
+                {"error": "Nu există un test zilnic activ."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if session.is_completed:
+            total = len(session.exercise_instances)
+            return Response({
+                "results": {},
+                "is_completed": True,
+                "completed_count": len(session.completed_indices),
+                "total_count": total,
+                "pending_exercises": [],
+            })
+
+        raw_answers = request.data.get("answers") or {}
+        if not isinstance(raw_answers, dict):
+            return Response(
+                {"error": "Câmpul answers trebuie să fie un obiect."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        instances = list(session.exercise_instances)
+        completed_set = set(session.completed_indices)
+        results: dict[str, dict] = {}
+        regenerated_pending: list[dict] = []
+
+        for key, student_answer in raw_answers.items():
+            try:
+                idx = int(key)
+            except (TypeError, ValueError):
+                continue
+            if idx < 0 or idx >= len(instances) or idx in completed_set:
+                continue
+
+            instance = instances[idx]
+            exercise_id = instance.get("exercise_id")
+            instance_token = instance.get("instance_token")
+
+            try:
+                exercise = Exercise.objects.select_related("topic").get(id=exercise_id)
+            except Exercise.DoesNotExist:
+                continue
+
+            is_correct = False
+            correct_display = None
+            expired = False
+
+            try:
+                payload = decode_instance_token(instance_token)
+                grading_data = payload.get("grading_data", payload)
+                is_correct, _ = grade_attempt(
+                    exercise.exercise_type, student_answer, grading_data,
+                )
+                if not is_correct:
+                    correct_display = _correct_answer_display(
+                        exercise.exercise_type, grading_data,
+                    )
+            except SignatureExpired:
+                expired = True
+            except Exception:
+                pass
+
+            if is_correct:
+                completed_set.add(idx)
+                session.answers[str(idx)] = student_answer
+                results[str(idx)] = {"is_correct": True, "correct_answer": None}
+                continue
+
+            try:
+                new_instance = generate_instance(exercise)
+                new_instance["exercise_id"] = exercise.id
+            except Exception:
+                new_instance = instance
+            instances[idx] = new_instance
+
+            results[str(idx)] = {
+                "is_correct": False,
+                "correct_answer": correct_display,
+            }
+            regenerated_pending.append({**new_instance, "index": idx})
+
+        session.exercise_instances = instances
+        session.completed_indices = sorted(completed_set)
+
+        total = len(instances)
+        if total > 0 and len(completed_set) == total:
+            session.is_completed = True
+            session.completed_at = timezone.now()
+            session.save()
+            try:
+                record_activity(request.user, "daily_test")
+            except Exception:
+                logger.warning("Streak update failed", exc_info=True)
+        else:
+            session.save(update_fields=["exercise_instances", "completed_indices", "answers"])
+
+        return Response({
+            "results": results,
+            "is_completed": session.is_completed,
+            "completed_count": len(session.completed_indices),
+            "total_count": total,
+            "pending_exercises": regenerated_pending,
+        })
 
 
 # ─── Test session views ───────────────────────────────────────────────────────

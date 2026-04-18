@@ -239,3 +239,33 @@ class StreakActivity(models.Model):
 
     def __str__(self):
         return f"{self.student.email} — {self.date} ({self.activity_type})"
+
+
+class DailyTestSession(models.Model):
+    """A 5-exercise daily test for a student, scoped to a Europe/Bucharest local date."""
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="daily_test_sessions",
+        limit_choices_to={"user_type": "student"},
+    )
+    date = models.DateField()
+    exercise_instances = models.JSONField(default=list)
+    completed_indices = models.JSONField(default=list)
+    answers = models.JSONField(
+        default=dict,
+        help_text='Submitted answers for completed slots: {"0": student_answer, ...}',
+    )
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "daily_test_sessions"
+        unique_together = [("student", "date")]
+        ordering = ["-date"]
+
+    def __str__(self):
+        status = "✓" if self.is_completed else f"{len(self.completed_indices)}/5"
+        return f"{self.student.email} — {self.date} ({status})"

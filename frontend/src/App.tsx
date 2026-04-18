@@ -11,6 +11,7 @@ import LessonViewer from "@/components/lesson/LessonViewer";
 import GradePage from "@/pages/GradePage";
 import PracticePage from "@/pages/PracticePage"
 import TestPage from "@/pages/TestPage";
+import DailyTestPage from "@/pages/DailyTestPage";
 import ExerciseHubPage from "@/pages/ExerciseHubPage";
 import ExercisesOverviewPage from "@/pages/ExercisesOverviewPage";
 import TestsOverviewPage from "@/pages/TestsOverviewPage";
@@ -59,6 +60,7 @@ function AppRoutes() {
       <Route path="/lesson/:lessonId" element={ <ProtectedRoute> <LessonViewer /> </ProtectedRoute> } />
       <Route path="/grade/:gradeNumber" element={ <ProtectedRoute> <GradePage /> </ProtectedRoute> } />
       <Route path="/test/:testId" element={<ProtectedRoute><TestPage /></ProtectedRoute>} />
+      <Route path="/daily" element={<ProtectedRoute allowedTypes={["student"]}><DailyTestPage /></ProtectedRoute>} />
       <Route path="/exercises" element={<ProtectedRoute><ExercisesOverviewPage /></ProtectedRoute>} />
       <Route path="/tests" element={<ProtectedRoute><TestsOverviewPage /></ProtectedRoute>} />
       <Route path="/admin-preview/exercise/:exerciseId" element={<ProtectedRoute><AdminPreviewPage /></ProtectedRoute>} />

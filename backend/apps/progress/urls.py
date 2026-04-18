@@ -1,6 +1,9 @@
 from django.urls import path
 
 from .views import (
+    DailyTestStartView,
+    DailyTestSubmitView,
+    DailyTestView,
     DashboardView,
     ExerciseAttemptView,
     ExercisesOverviewView,
@@ -47,4 +50,9 @@ urlpatterns = [
 
     # Streak
     path("streak/", StreakView.as_view(), name="streak"),
+
+    # Daily test
+    path("daily/", DailyTestView.as_view(), name="daily_test"),
+    path("daily/start/", DailyTestStartView.as_view(), name="daily_test_start"),
+    path("daily/submit/", DailyTestSubmitView.as_view(), name="daily_test_submit"),
 ]
