@@ -173,10 +173,25 @@ export interface TopicTestSummary {
   attempts_count: number;
   passed: boolean | null;
   best_score: number | null;
+  is_locked: boolean;
+}
+
+export interface UnitTestSummary {
+  test_id: number;
+  unit_id: number;
+  unit_title: string;
+  unit_order: number;
+  pass_threshold: number;
+  time_limit_minutes: number | null;
+  attempts_count: number;
+  passed: boolean | null;
+  best_score: number | null;
+  is_locked: boolean;
 }
 
 export interface TestsOverviewResponse {
   tests: TopicTestSummary[];
+  unit_tests: UnitTestSummary[];
 }
 
 // ─── Streak ───────────────────────────────────────────────────────────────────

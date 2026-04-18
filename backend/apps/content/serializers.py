@@ -23,9 +23,34 @@ class GlossaryTermSerializer(serializers.ModelSerializer):
 
 
 class TestSerializer(serializers.ModelSerializer):
+    is_locked = serializers.SerializerMethodField()
+    best_score = serializers.SerializerMethodField()
+    passed = serializers.SerializerMethodField()
+    attempts_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Test
-        fields = ["id", "scope", "pass_threshold", "time_limit_minutes", "composition"]
+        fields = [
+            "id", "scope", "pass_threshold", "time_limit_minutes",
+            "composition",
+            "is_locked", "best_score", "passed", "attempts_count",
+        ]
+
+    def get_is_locked(self, obj):
+        test_unlock_map = self.context.get("test_unlock_map", {})
+        return not test_unlock_map.get(obj.id, True)
+
+    def get_best_score(self, obj):
+        info = self.context.get("test_attempt_map", {}).get(obj.id)
+        return info["best_score"] if info else None
+
+    def get_passed(self, obj):
+        info = self.context.get("test_attempt_map", {}).get(obj.id)
+        return info["passed"] if info else False
+
+    def get_attempts_count(self, obj):
+        info = self.context.get("test_attempt_map", {}).get(obj.id)
+        return info["attempts_count"] if info else 0
 
 
 # ─── Lesson serializers ───────────────────────────────────────────────────────
@@ -33,6 +58,8 @@ class TestSerializer(serializers.ModelSerializer):
 class LessonListSerializer(serializers.ModelSerializer):
     """Lightweight lesson for listing inside a topic."""
     is_locked = serializers.SerializerMethodField()
+    progress_status = serializers.SerializerMethodField()
+    mastery_tier = serializers.SerializerMethodField()
     topic_id = serializers.IntegerField(source="topic.id", read_only=True)
     topic_test_id = serializers.SerializerMethodField()
 
@@ -41,12 +68,20 @@ class LessonListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "order", "title", "summary",
             "topic_id", "topic_test_id",
-            "is_locked",
+            "is_locked", "progress_status", "mastery_tier",
         ]
 
     def get_is_locked(self, obj):
         unlock_map = self.context.get("unlock_map", {})
         return not unlock_map.get(obj.id, True)
+
+    def get_progress_status(self, obj):
+        lesson_progress_map = self.context.get("lesson_progress_map", {})
+        return lesson_progress_map.get(obj.id, "not_started")
+
+    def get_mastery_tier(self, obj):
+        mastery_map = self.context.get("topic_mastery_map", {})
+        return mastery_map.get(obj.topic_id, "none")
 
     def get_topic_test_id(self, obj):
         try:
@@ -62,6 +97,7 @@ class LessonDetailSerializer(serializers.ModelSerializer):
     topic_title = serializers.CharField(source="topic.title", read_only=True)
     topic_order = serializers.IntegerField(source="topic.order", read_only=True)
     topic_test_id = serializers.SerializerMethodField()
+    topic_test_locked = serializers.SerializerMethodField()
     topic_exercise_count = serializers.SerializerMethodField()
     unit_id = serializers.IntegerField(source="topic.unit.id", read_only=True)
     unit_title = serializers.CharField(source="topic.unit.title", read_only=True)
@@ -75,7 +111,7 @@ class LessonDetailSerializer(serializers.ModelSerializer):
         model = Lesson
         fields = [
             "id", "order", "title", "summary", "blocks",
-            "topic_id", "topic_title", "topic_order", "topic_test_id",
+            "topic_id", "topic_title", "topic_order", "topic_test_id", "topic_test_locked",
             "topic_exercise_count",
             "unit_id", "unit_title", "unit_order", "grade_number",
             "prev_lesson_id", "next_lesson_id",
@@ -83,12 +119,32 @@ class LessonDetailSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    def get_topic_test_id(self, obj):
+    def _published_topic_test(self, obj):
         try:
             test = obj.topic.test
-            return test.id if test.is_published else None
-        except Exception:
+        except Test.DoesNotExist:
             return None
+        if not test or not test.is_published:
+            return None
+        return test
+
+    def get_topic_test_id(self, obj):
+        test = self._published_topic_test(obj)
+        return test.id if test else None
+
+    def get_topic_test_locked(self, obj):
+        test = self._published_topic_test(obj)
+        if not test:
+            return False
+        from apps.progress.unlock import is_test_unlocked
+        passed_test_ids = self.context.get("passed_test_ids")
+        if passed_test_ids is None:
+            from apps.progress.unlock import get_passed_test_ids
+            request = self.context.get("request")
+            if request is None:
+                return False
+            passed_test_ids = get_passed_test_ids(request.user)
+        return not is_test_unlocked(test, passed_test_ids)
 
     def get_topic_exercise_count(self, obj):
         return obj.topic.exercises.filter(is_active=True).count()
@@ -159,16 +215,23 @@ class LessonDetailSerializer(serializers.ModelSerializer):
 class TopicListSerializer(serializers.ModelSerializer):
     """Topic with lesson list — used on GradePage / UnitDetailView."""
     lessons = serializers.SerializerMethodField()
-    test = TestSerializer(read_only=True)
+    test = serializers.SerializerMethodField()
     exercise_count = serializers.SerializerMethodField()
+    has_practiced = serializers.SerializerMethodField()
+    mastery_tier = serializers.SerializerMethodField()
 
     class Meta:
         model = Topic
         fields = [
             "id", "order", "title", "description",
             "is_published", "practice_minimum",
-            "exercise_count", "lessons", "test",
+            "exercise_count", "has_practiced", "mastery_tier",
+            "lessons", "test",
         ]
+
+    def get_mastery_tier(self, obj):
+        mastery_map = self.context.get("topic_mastery_map", {})
+        return mastery_map.get(obj.id, "none")
 
     def get_lessons(self, obj):
         lessons = obj.published_lessons
@@ -178,8 +241,21 @@ class TopicListSerializer(serializers.ModelSerializer):
             context=self.context,
         ).data
 
+    def get_test(self, obj):
+        try:
+            test = obj.test
+        except Test.DoesNotExist:
+            return None
+        if not test or not test.is_published:
+            return None
+        return TestSerializer(test, context=self.context).data
+
     def get_exercise_count(self, obj):
         return obj.exercises.filter(is_active=True).count()
+
+    def get_has_practiced(self, obj):
+        practiced_ids = self.context.get("practiced_topic_ids", set())
+        return obj.id in practiced_ids
 
 
 # ─── Unit serializers ─────────────────────────────────────────────────────────
@@ -187,7 +263,7 @@ class TopicListSerializer(serializers.ModelSerializer):
 class UnitListSerializer(serializers.ModelSerializer):
     """Unit with topic summaries and test info."""
     topics = serializers.SerializerMethodField()
-    test = TestSerializer(read_only=True)
+    test = serializers.SerializerMethodField()
     topic_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -205,6 +281,15 @@ class UnitListSerializer(serializers.ModelSerializer):
             many=True,
             context=self.context,
         ).data
+
+    def get_test(self, obj):
+        try:
+            test = obj.test
+        except Test.DoesNotExist:
+            return None
+        if not test or not test.is_published:
+            return None
+        return TestSerializer(test, context=self.context).data
 
     def get_topic_count(self, obj):
         return obj.topics.filter(is_published=True).count()

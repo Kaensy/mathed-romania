@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ArrowLeft, PenLine, ClipboardList  } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, PenLine, ClipboardList, Lock } from "lucide-react";
 import { BlockRenderer } from "./Blocks";
 import type { LessonDetail } from "@/types/lesson";
 import api from "@/api/client";
@@ -134,15 +134,26 @@ export default function LessonViewer() {
               <div className="mt-12 pt-6 border-t border-gray-200 space-y-4">
 
                   {lesson.topic_test_id && (
-  <Link
-    to={`/test/${lesson.topic_test_id}`}
-    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
-      bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors"
-  >
-    <ClipboardList className="w-4 h-4" />
-    Susține testul
-  </Link>
-)}
+                    lesson.topic_test_locked ? (
+                      <div
+                        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
+                          bg-gray-100 text-gray-400 font-semibold cursor-not-allowed"
+                      >
+                        <Lock className="w-4 h-4" />
+                        Finalizează testul anterior pentru a debloca
+                      </div>
+                    ) : (
+                      <Link
+                        to={`/test/${lesson.topic_test_id}`}
+                        state={{ from: `/lesson/${lessonId}` }}
+                        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl
+                          bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors"
+                      >
+                        <ClipboardList className="w-4 h-4" />
+                        Susține testul
+                      </Link>
+                    )
+                  )}
 
 {lesson.topic_exercise_count > 0 && (
   <Link

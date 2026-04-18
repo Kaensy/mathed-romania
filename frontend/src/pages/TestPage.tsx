@@ -10,7 +10,7 @@
  *   - Final screen reveals score, pass/fail, and per-question breakdown
  */
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -34,6 +34,8 @@ import type {
 export default function TestPage() {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const backTarget = (location.state as { from?: string } | null)?.from ?? "/tests";
 
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [exercises, setExercises] = useState<ExerciseInstance[]>([]);
@@ -59,7 +61,15 @@ export default function TestPage() {
         });
         setAnswers(restored);
       })
-      .catch(() => setError("Nu am putut încărca testul. Încearcă din nou."))
+      .catch((err) => {
+        if (err?.response?.data?.locked) {
+          setError(
+            "Testul nu este disponibil încă. Completează testul anterior pentru a-l debloca."
+          );
+        } else {
+          setError("Nu am putut încărca testul. Încearcă din nou.");
+        }
+      })
       .finally(() => setLoading(false));
   }, [testId]);
 
@@ -102,7 +112,7 @@ export default function TestPage() {
   const allAnswered = answeredCount === totalCount;
 
   if (loading) return <TestSkeleton />;
-  if (error) return <TestError message={error} onRetry={() => navigate("/tests")} />;
+  if (error) return <TestError message={error} onRetry={() => navigate(backTarget)} />;
   if (result) {
     return (
       <TestResultScreen
@@ -150,7 +160,7 @@ export default function TestPage() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
           <button
-            onClick={() => navigate("/tests")}
+            onClick={() => navigate(backTarget)}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from apps.content.models import Exercise, Lesson, Topic, Test
 from apps.progress.exercise_engine import decode_instance_token, generate_instance
 from apps.progress.grading import grade_attempt
+from apps.progress.unlock import get_passed_test_ids, get_test_unlock_map, is_test_unlocked
 from apps.progress.models import (
     CategoryProgress,
     ExerciseAttempt,
@@ -577,19 +578,26 @@ class TestsOverviewView(APIView):
 
         user = request.user
 
-        tests = (
+        topic_tests = list(
             Test.objects
             .filter(scope=Test.Scope.TOPIC, is_published=True, topic__is_published=True)
             .select_related("topic__unit__grade")
             .order_by("topic__unit__order", "topic__order")
         )
-        test_ids = [t.id for t in tests]
+        unit_tests = list(
+            Test.objects
+            .filter(scope=Test.Scope.UNIT, is_published=True, unit__is_published=True)
+            .select_related("unit__grade")
+            .order_by("unit__grade__number", "unit__order")
+        )
+        all_tests = topic_tests + unit_tests
+        all_test_ids = [t.id for t in all_tests]
 
         attempt_stats = (
             TestAttempt.objects
             .filter(
                 student=user,
-                test_id__in=test_ids,
+                test_id__in=all_test_ids,
                 status=TestAttempt.Status.COMPLETED,
             )
             .values("test_id")
@@ -601,25 +609,50 @@ class TestsOverviewView(APIView):
         )
         attempt_map = {row["test_id"]: row for row in attempt_stats}
 
-        results = []
-        for test in tests:
-            a = attempt_map.get(test.id)
-            results.append({
-                "test_id": test.id,
-                "topic_id": test.topic_id,
-                "topic_title": test.topic.title,
-                "unit_id": test.topic.unit_id,
-                "unit_title": test.topic.unit.title,
-                "unit_order": test.topic.unit.order,
-                "topic_order": test.topic.order,
-                "pass_threshold": test.pass_threshold,
-                "time_limit_minutes": test.time_limit_minutes,
+        passed_test_ids = get_passed_test_ids(user)
+        test_unlock_map = get_test_unlock_map(all_tests, user, passed_test_ids=passed_test_ids)
+
+        def _attempt_fields(test_id: int) -> dict:
+            a = attempt_map.get(test_id)
+            return {
                 "attempts_count": a["attempts_count"] if a else 0,
                 "passed": bool(a["passed_count"]) if a else None,
-                "best_score": float(a["best_score"]) if a and a["best_score"] is not None else None,
-            })
+                "best_score": (
+                    float(a["best_score"]) if a and a["best_score"] is not None else None
+                ),
+                "is_locked": not test_unlock_map.get(test_id, True),
+            }
 
-        return Response({"tests": results})
+        topic_results = [
+            {
+                "test_id": t.id,
+                "topic_id": t.topic_id,
+                "topic_title": t.topic.title,
+                "unit_id": t.topic.unit_id,
+                "unit_title": t.topic.unit.title,
+                "unit_order": t.topic.unit.order,
+                "topic_order": t.topic.order,
+                "pass_threshold": t.pass_threshold,
+                "time_limit_minutes": t.time_limit_minutes,
+                **_attempt_fields(t.id),
+            }
+            for t in topic_tests
+        ]
+
+        unit_results = [
+            {
+                "test_id": t.id,
+                "unit_id": t.unit_id,
+                "unit_title": t.unit.title,
+                "unit_order": t.unit.order,
+                "pass_threshold": t.pass_threshold,
+                "time_limit_minutes": t.time_limit_minutes,
+                **_attempt_fields(t.id),
+            }
+            for t in unit_tests
+        ]
+
+        return Response({"tests": topic_results, "unit_tests": unit_results})
 
 
 # ─── Exercise preview (admin) ─────────────────────────────────────────────────
@@ -779,6 +812,13 @@ class TestStartView(APIView):
             test = Test.objects.get(id=test_id, is_published=True)
         except Test.DoesNotExist:
             return Response({"error": "Testul nu există."}, status=status.HTTP_404_NOT_FOUND)
+
+        passed_test_ids = get_passed_test_ids(request.user)
+        if not is_test_unlocked(test, passed_test_ids):
+            return Response(
+                {"error": "Testul nu este disponibil încă.", "locked": True},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Reuse existing in-progress attempt if any
         attempt = TestAttempt.objects.filter(

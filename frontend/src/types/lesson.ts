@@ -145,9 +145,15 @@ export interface TestInfo {
   pass_threshold: number;
   time_limit_minutes: number | null;
   composition: unknown[];
+  is_locked: boolean;
+  best_score: number | null;
+  passed: boolean;
+  attempts_count: number;
 }
 
 // ─── Lesson ───────────────────────────────────────────────────────────────────
+
+export type MasteryTier = "none" | "deschisa" | "promovat" | "stapanit" | "perfect";
 
 export interface LessonListItem {
   id: number;
@@ -157,6 +163,8 @@ export interface LessonListItem {
   topic_id: number;
   topic_test_id: number | null;
   is_locked: boolean;
+  progress_status: "not_started" | "in_progress" | "completed";
+  mastery_tier: MasteryTier;
 }
 
 export interface LessonDetail {
@@ -170,6 +178,7 @@ export interface LessonDetail {
   topic_title: string;
   topic_order: number;
   topic_test_id: number | null;
+  topic_test_locked: boolean;
   topic_exercise_count: number;
   // Unit / grade context
   unit_id: number;
@@ -193,6 +202,8 @@ export interface TopicListItem {
   is_published: boolean;
   practice_minimum: number;
   exercise_count: number;
+  has_practiced: boolean;
+  mastery_tier: MasteryTier;
   lessons: LessonListItem[];
   test: TestInfo | null;
 }
