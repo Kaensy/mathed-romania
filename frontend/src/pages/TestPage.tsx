@@ -10,7 +10,7 @@
  *   - Final screen reveals score, pass/fail, and per-question breakdown
  */
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -20,12 +20,14 @@ import {
   AlertCircle,
   Trophy,
   RotateCcw,
+  Target,
 } from "lucide-react";
 import api from "@/api/client";
 import { InlineMath } from "@/lib/math";
 import type { ExerciseInstance } from "@/types/progress";
 import type {
   TestFinishResponse,
+  TestResultResponse,
   TestStartResponse,
 } from "@/types/test";
 import TestExerciseCard, { DifficultyBadge } from "@/components/exercise/TestExerciseCard";
@@ -36,7 +38,10 @@ export default function TestPage() {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const backTarget = (location.state as { from?: string } | null)?.from ?? "/tests";
+  const [searchParams] = useSearchParams();
+  const isReview = searchParams.get("review") === "true";
+  const backTarget = (location.state as { from?: string } | null)?.from
+    ?? (isReview ? "/test-history" : "/tests");
 
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [exercises, setExercises] = useState<ExerciseInstance[]>([]);
@@ -50,6 +55,24 @@ export default function TestPage() {
   useEffect(() => {
     if (!testId) return;
     setLoading(true);
+
+    if (isReview) {
+      api
+        .get<TestResultResponse>(`/progress/tests/${testId}/result/`)
+        .then((res) => {
+          setExercises(res.data.exercise_instances);
+          setResult({
+            score: res.data.score,
+            passed: res.data.passed,
+            pass_threshold: res.data.pass_threshold,
+            answers: res.data.answers,
+          });
+        })
+        .catch(() => setError("Nu am putut încărca rezultatele testului."))
+        .finally(() => setLoading(false));
+      return;
+    }
+
     api
       .post<TestStartResponse>(`/progress/tests/${testId}/start/`)
       .then((res) => {
@@ -72,7 +95,7 @@ export default function TestPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [testId]);
+  }, [testId, isReview]);
 
   const handleAnswer = (index: number, ans: string | string[] | Record<string, string>) => {
     setAnswers((prev) => ({ ...prev, [index]: ans }));
@@ -119,6 +142,7 @@ export default function TestPage() {
       <TestResultScreen
         result={result}
         exercises={exercises}
+        backTo={backTarget}
         onRetry={() => {
           setResult(null);
           setAnswers({});
@@ -283,9 +307,10 @@ interface TestResultScreenProps {
   result: TestFinishResponse;
   exercises: ExerciseInstance[];
   onRetry: () => void;
+  backTo?: string;
 }
 
-function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps) {
+function TestResultScreen({ result, exercises, onRetry, backTo = "/tests" }: TestResultScreenProps) {
   const navigate = useNavigate();
   const scoreInt = Math.round(Number(result.score));
   const romanianGrade = Math.round((scoreInt / 100) * 9 + 1);
@@ -316,11 +341,11 @@ function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps)
 
           <div className="flex gap-3 mt-6">
             <button
-              onClick={() => navigate("/tests")}
+              onClick={() => navigate(backTo)}
               className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600
                 font-medium hover:bg-gray-50 transition-colors text-sm"
             >
-              Înapoi la teste
+              Înapoi
             </button>
             {!result.passed && (
               <button
@@ -336,12 +361,25 @@ function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps)
           </div>
         </div>
 
+        <CategoryBreakdown exercises={exercises} answers={result.answers} />
+
         {/* Per-question breakdown */}
         <h3 className="text-sm font-semibold text-gray-600 mb-3">Recapitulare</h3>
         <div className="space-y-3">
           {exercises.map((exercise, i) => {
             const answerRecord = result.answers[String(i)];
             const isCorrect = answerRecord?.is_correct ?? false;
+            const isComparison = Boolean(exercise.left && exercise.right);
+            const rawStudentAnswer = answerRecord?.answer;
+            const studentAnswerText = isComparison && typeof rawStudentAnswer === "string" && rawStudentAnswer.length > 0
+              ? `${exercise.left} ${rawStudentAnswer} ${exercise.right}`
+              : formatAnswerForDisplay(rawStudentAnswer, exercise);
+            const rawCorrectAnswer = answerRecord?.correct_answer;
+            const correctAnswerText = rawCorrectAnswer
+              ? isComparison
+                ? `${exercise.left} ${rawCorrectAnswer} ${exercise.right}`
+                : formatCorrectAnswerForDisplay(rawCorrectAnswer, exercise)
+              : null;
             return (
               <div
                 key={i}
@@ -354,19 +392,49 @@ function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps)
                     : <XCircle className="w-5 h-5" />
                   }
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700 font-medium">
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  {exercise.category_label && (
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">
+                      {exercise.category_label}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-800 font-medium break-words">
                     <InlineMath text={exercise.question} />
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Răspunsul tău: <span className="font-mono">
-                      {answerRecord?.answer !== undefined
-                        ? exercise.display_mode === "digit_click" && exercise.number_string
-                          ? exercise.number_string[parseInt(String(answerRecord.answer), 10)] ?? String(answerRecord.answer)
-                          : String(answerRecord.answer)
-                        : "—"}
+                  {(exercise.exercise_type === "comparison" || (exercise.left && exercise.right)) && (
+                    <p className="text-sm text-gray-700 break-words">
+                      <InlineMath text={exercise.left ?? ""} />
+                      <span className="mx-2 text-gray-400">___</span>
+                      <InlineMath text={exercise.right ?? ""} />
+                    </p>
+                  )}
+                  {(exercise.exercise_type === "drag_order" || exercise.items) && exercise.items && exercise.items.length > 0 && (
+                    <p className="text-sm text-gray-700 break-words">
+                      <span className="text-gray-500">Numere: </span>
+                      {exercise.items.map((item, idx) => (
+                        <span key={idx}>
+                          <InlineMath text={item} />
+                          {idx < exercise.items!.length - 1 && <span className="text-gray-400">, </span>}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Răspunsul tău:{" "}
+                    <span className="text-gray-700">
+                      {studentAnswerText !== null
+                        ? renderAnswerValue(studentAnswerText, exercise)
+                        : <span className="text-gray-400">—</span>}
                     </span>
                   </p>
+                  {!isCorrect && correctAnswerText && (
+                    <p className="text-xs text-green-600">
+                      Răspuns corect:{" "}
+                      <span className="font-medium">
+                        {renderAnswerValue(correctAnswerText, exercise)}
+                      </span>
+                    </p>
+                  )}
                 </div>
                 <DifficultyBadge difficulty={exercise.difficulty} />
               </div>
@@ -378,7 +446,133 @@ function TestResultScreen({ result, exercises, onRetry }: TestResultScreenProps)
   );
 }
 
+// ─── Category breakdown ──────────────────────────────────────────────────────
+
+function CategoryBreakdown({
+  exercises,
+  answers,
+}: {
+  exercises: ExerciseInstance[];
+  answers: TestFinishResponse["answers"];
+}) {
+  const navigate = useNavigate();
+
+  const groups = new Map<
+    string,
+    { label: string; topicId: number | null; total: number; wrong: number }
+  >();
+
+  exercises.forEach((ex, i) => {
+    const category = ex.category;
+    if (!category) return;
+    const existing = groups.get(category) ?? {
+      label: ex.category_label ?? category,
+      topicId: ex.topic_id ?? null,
+      total: 0,
+      wrong: 0,
+    };
+    existing.total += 1;
+    if (answers[String(i)]?.is_correct === false) {
+      existing.wrong += 1;
+    }
+    groups.set(category, existing);
+  });
+
+  const weakGroups = Array.from(groups.entries())
+    .filter(([, g]) => g.wrong > 0)
+    .sort(([, a], [, b]) => b.wrong - a.wrong);
+
+  if (weakGroups.length === 0) return null;
+
+  return (
+    <section className="mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        <Target className="w-4 h-4 text-indigo-500" />
+        <h3 className="text-sm font-semibold text-gray-600">Categorii de îmbunătățit</h3>
+      </div>
+      <div className="space-y-2">
+        {weakGroups.map(([category, g]) => (
+          <div
+            key={category}
+            className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center gap-3"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-800 text-sm truncate" title={g.label}>
+                {g.label}
+              </p>
+              <p className="text-xs text-red-500 mt-0.5">
+                {g.wrong} din {g.total} {g.total === 1 ? "greșit" : "greșite"}
+              </p>
+            </div>
+            {g.topicId !== null && (
+              <button
+                onClick={() =>
+                  navigate(`/topic/${g.topicId}/practice`, {
+                    state: { category, from: "test_result" },
+                  })
+                }
+                className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-700 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                Exersează
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatAnswerForDisplay(
+  answer: string | string[] | undefined,
+  exercise: ExerciseInstance,
+): string | string[] | null {
+  if (answer === undefined || answer === null) return null;
+
+  if (Array.isArray(answer)) {
+    if (answer.length === 0) return null;
+    if (exercise.display_mode === "digit_click" && exercise.number_string) {
+      const digits = answer
+        .map((pos) => exercise.number_string![Number(pos)])
+        .filter((d) => d !== undefined);
+      return digits.length > 0 ? digits.join(", ") : null;
+    }
+    return answer;
+  }
+
+  const str = String(answer);
+  return str.length > 0 ? str : null;
+}
+
+function formatCorrectAnswerForDisplay(
+  correctAnswer: string,
+  exercise: ExerciseInstance,
+): string | string[] {
+  if (exercise.exercise_type === "drag_order" && correctAnswer.includes(",")) {
+    return correctAnswer.split(",").map((s) => s.trim());
+  }
+  return correctAnswer;
+}
+
+function renderAnswerValue(value: string | string[], exercise: ExerciseInstance) {
+  if (Array.isArray(value)) {
+    const separator =
+      exercise.order_direction === "ascending"
+        ? "<"
+        : exercise.order_direction === "descending"
+        ? ">"
+        : "→";
+    return value.map((item, idx) => (
+      <span key={idx}>
+        <InlineMath text={item} />
+        {idx < value.length - 1 && <span className="mx-1 text-gray-400">{separator}</span>}
+      </span>
+    ));
+  }
+  return <InlineMath text={value} />;
+}
 
 function TestSkeleton() {
   return (

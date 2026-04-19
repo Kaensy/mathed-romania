@@ -13,12 +13,14 @@ from .views import (
     LessonOpenView,
     StreakView,
     TestsOverviewView,
+    TestHistoryView,
     TestStartView,
     TestAnswerView,
     TestFinishView,
     TestResultView,
     TopicCategoriesView,
     TopicPracticeView,
+    WeakCategoriesView,
 )
 
 urlpatterns = [
@@ -38,12 +40,14 @@ urlpatterns = [
     # Overview pages
     path("exercises-overview/", ExercisesOverviewView.as_view(), name="exercises_overview"),
     path("tests-overview/", TestsOverviewView.as_view(), name="tests_overview"),
+    path("weak-categories/", WeakCategoriesView.as_view(), name="weak_categories"),
 
     # Test session
     path("tests/<int:test_id>/start/", TestStartView.as_view(), name="test_start"),
     path("tests/<int:test_id>/answer/", TestAnswerView.as_view(), name="test_answer"),
     path("tests/<int:test_id>/finish/", TestFinishView.as_view(), name="test_finish"),
     path("tests/<int:test_id>/result/", TestResultView.as_view(), name="test_result"),
+    path("test-history/", TestHistoryView.as_view(), name="test_history"),
 
     # Dashboard
     path("dashboard/", DashboardView.as_view(), name="dashboard"),

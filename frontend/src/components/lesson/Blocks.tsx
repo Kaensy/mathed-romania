@@ -18,6 +18,7 @@ import type {
   WorkedExampleMulti,
   PropertiesList,
   SummaryTable,
+  SymbolReference,
   CollapsibleSection,
   InteractiveComponent,
   LessonBlock,
@@ -372,6 +373,33 @@ export function SummaryTableComponent({ block }: { block: SummaryTable }) {
   );
 }
 
+// ─── Symbol Reference ─────────────────────────────────────────────────────────
+
+export function SymbolReferenceComponent({ block }: { block: SymbolReference }) {
+  return (
+    <div className="my-5 border border-gray-200 bg-gray-50 rounded-lg p-4">
+      {block.title && (
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">
+          <InlineMath text={block.title} />
+        </h4>
+      )}
+      <div className="flex flex-wrap gap-3">
+        {block.symbols.map((entry, i) => (
+          <div
+            key={i}
+            className="min-w-[100px] flex-1 flex flex-col items-center justify-center text-center bg-white border border-gray-200 rounded-md px-3 py-2"
+          >
+            <BlockMath latex={entry.symbol} className="text-lg" />
+            <div className="text-xs text-gray-500 mt-1">
+              <InlineMath text={entry.name} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Collapsible Section ──────────────────────────────────────────────────────
 
 export function CollapsibleSectionComponent({ block }: { block: CollapsibleSection }) {
@@ -529,6 +557,8 @@ export function BlockRenderer({ block }: { block: LessonBlock }) {
       return <PropertiesListComponent block={block} />;
     case "summary_table":
       return <SummaryTableComponent block={block} />;
+    case "symbol_reference":
+      return <SymbolReferenceComponent block={block} />;
     case "collapsible":
       return <CollapsibleSectionComponent block={block} />;
     case "interactive":

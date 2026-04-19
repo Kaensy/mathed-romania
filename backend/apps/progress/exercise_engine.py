@@ -489,11 +489,15 @@ def generate_instance(exercise) -> dict:
     return instance
 
 
-def decode_instance_token(token: str) -> dict:
+def decode_instance_token(token: str, max_age: int | None = 3600) -> dict:
     """
     Decode and verify a signed instance token.
 
     Returns the payload dict with keys: exercise_id, exercise_type, grading_data.
-    Raises signing.BadSignature if tampered, signing.SignatureExpired if older than 1 hour.
+    Raises signing.BadSignature if tampered. Raises signing.SignatureExpired
+    if older than max_age seconds; pass max_age=None to skip expiry enforcement
+    (used by long-running test attempts that may outlive the 1-hour default).
     """
-    return signing.loads(token, salt=_TOKEN_SALT, max_age=3600)
+    if max_age is None:
+        return signing.loads(token, salt=_TOKEN_SALT)
+    return signing.loads(token, salt=_TOKEN_SALT, max_age=max_age)

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
-import { BookOpen, PenLine, BarChart3, Flame, CheckCircle2 } from "lucide-react";
+import { BookOpen, PenLine, BarChart3, Flame, CheckCircle2, Target } from "lucide-react";
 import api from "@/api/client";
-import type { DashboardStats } from "@/types/progress";
+import type { DashboardStats, WeakCategoriesResponse, WeakCategory } from "@/types/progress";
 import type { DailyTestResponse } from "@/types/daily";
 import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [weakCategories, setWeakCategories] = useState<WeakCategory[] | null>(null);
   const [streakModalOpen, setStreakModalOpen] = useState(false);
   const { streak, loading: loadingStreak } = useStreak();
 
@@ -24,6 +25,14 @@ export default function DashboardPage() {
       .catch(() => {/* non-fatal — show placeholders */})
       .finally(() => setLoadingStats(false));
   }, []);
+
+  useEffect(() => {
+    if (user?.user_type !== "student") return;
+    api
+      .get<WeakCategoriesResponse>("/progress/weak-categories/?limit=3")
+      .then((res) => setWeakCategories(res.data.categories))
+      .catch(() => {/* non-fatal — hide widget */});
+  }, [user?.user_type]);
 
   const handleLogout = async () => {
     await logout();
@@ -49,9 +58,12 @@ export default function DashboardPage() {
                 onClick={() => setStreakModalOpen(true)}
               />
             )}
-            <span className="text-sm text-gray-600">
+            <Link
+              to="/profile"
+              className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+            >
               {user.first_name} {user.last_name}
-            </span>
+            </Link>
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
               {user.user_type === "student" ? "Elev" : user.user_type === "teacher" ? "Profesor" : "Admin"}
             </span>
@@ -106,6 +118,23 @@ export default function DashboardPage() {
         {/* Daily test widget */}
         {user.user_type === "student" && <DailyTestCard />}
 
+        {/* Recomandat pentru tine — weak categories */}
+        {user.user_type === "student" && weakCategories && weakCategories.length > 0 && (
+          <section className="mt-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="w-5 h-5 text-indigo-500" />
+              <h3 className="text-base font-semibold text-gray-700">
+                Recomandat pentru tine
+              </h3>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {weakCategories.map((cat) => (
+                <WeakCategoryCard key={`${cat.topic_id}-${cat.category}`} cat={cat} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Navigation cards */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link
@@ -121,11 +150,21 @@ export default function DashboardPage() {
   <h3 className="font-semibold text-gray-900">Exerciții</h3>
   <p className="mt-1 text-sm text-gray-500">Toate exercițiile tale</p>
 </Link>
-          <Link to="/tests" className="rounded-xl border bg-white p-6 hover:border-indigo-300 hover:shadow-sm transition-all block">
-  <div className="mb-3 text-2xl">🏆</div>
-  <h3 className="font-semibold text-gray-900">Teste</h3>
-  <p className="mt-1 text-sm text-gray-500">Evaluările lecțiilor</p>
-</Link>
+          <div className="flex flex-col">
+            <Link to="/tests" className="rounded-xl border bg-white p-6 hover:border-indigo-300 hover:shadow-sm transition-all block">
+              <div className="mb-3 text-2xl">🏆</div>
+              <h3 className="font-semibold text-gray-900">Teste</h3>
+              <p className="mt-1 text-sm text-gray-500">Evaluările lecțiilor</p>
+            </Link>
+            {user.user_type === "student" && (
+              <Link
+                to="/test-history"
+                className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline self-end"
+              >
+                Vezi istoricul →
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Per-unit progress — only show if we have data and user is student */}
@@ -301,6 +340,48 @@ function formatShortTime(iso: string): string | null {
   } catch {
     return null;
   }
+}
+
+function WeakCategoryCard({ cat }: { cat: WeakCategory }) {
+  const pct = Math.round(cat.accuracy * 100);
+  const barColor =
+    cat.accuracy < 0.4
+      ? "bg-red-400"
+      : cat.accuracy < 0.7
+      ? "bg-amber-400"
+      : "bg-emerald-400";
+
+  return (
+    <div className="rounded-xl border bg-white p-4 flex flex-col gap-3">
+      <div className="min-w-0">
+        <p className="font-semibold text-gray-900 truncate" title={cat.category_label}>
+          {cat.category_label}
+        </p>
+        <p className="text-xs text-gray-500 truncate mt-0.5" title={cat.topic_title}>
+          {cat.topic_title}
+        </p>
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-gray-400">Acuratețe</span>
+          <span className="text-xs font-medium text-gray-600">{pct}%</span>
+        </div>
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className={`h-1.5 rounded-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+      <Link
+        to={`/topic/${cat.topic_id}/practice`}
+        state={{ category: cat.category, from: "dashboard" }}
+        className="mt-auto text-center text-sm font-medium text-indigo-600 hover:text-indigo-700 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 transition-colors px-3 py-1.5"
+      >
+        Exersează
+      </Link>
+    </div>
+  );
 }
 
 function StatCard({

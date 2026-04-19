@@ -17,7 +17,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.core.signing import SignatureExpired
-from django.db.models import Case, Count, IntegerField, When
+from django.db.models import Case, Count, F, IntegerField, When
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -373,6 +373,21 @@ class ExerciseAttemptView(APIView):
         except Exception:
             logger.warning("Streak update failed", exc_info=True)
 
+        # ── Category stats update (atomic, F-expressions) ────────────
+        if exercise.category:
+            cp_stats, _ = CategoryProgress.objects.get_or_create(
+                student=request.user,
+                topic=exercise.topic,
+                category=exercise.category,
+            )
+            stats_update = {
+                "total_attempts": F("total_attempts") + 1,
+                "last_attempted_at": timezone.now(),
+            }
+            if is_correct:
+                stats_update["correct_attempts"] = F("correct_attempts") + 1
+            CategoryProgress.objects.filter(pk=cp_stats.pk).update(**stats_update)
+
         # ── Hint counter update ──────────────────────────────────────
         if not is_correct and session_id and exercise.category:
             prior_wrong = ExerciseAttempt.objects.filter(
@@ -495,6 +510,73 @@ class HintUsedView(APIView):
         ).update(category_failure_count=0)
 
         return Response({"reset": updated > 0})
+
+
+# ─── Weak categories ──────────────────────────────────────────────────────────
+
+class WeakCategoriesView(APIView):
+    """
+    GET /api/v1/progress/weak-categories/?limit=3
+
+    Returns the student's weakest practice categories ranked by lowest
+    accuracy. Requires ≥5 attempts per category; excludes cleared
+    (medium_cleared=True) categories and empty-category rows.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            limit = int(request.query_params.get("limit", 3))
+        except (TypeError, ValueError):
+            limit = 3
+        limit = max(1, min(limit, 10))
+
+        rows = list(
+            CategoryProgress.objects
+            .filter(
+                student=request.user,
+                total_attempts__gte=5,
+                medium_cleared=False,
+            )
+            .exclude(category="")
+            .select_related("topic")
+        )
+
+        def _sort_key(cp):
+            accuracy = cp.correct_attempts / cp.total_attempts if cp.total_attempts else 0.0
+            recency = cp.last_attempted_at.timestamp() if cp.last_attempted_at else 0.0
+            return (accuracy, -recency)
+
+        rows.sort(key=_sort_key)
+        ranked = rows[:limit]
+
+        unique_categories = {cp.category for cp in ranked}
+        label_map: dict[str, str] = {}
+        if unique_categories:
+            for ex in (
+                Exercise.objects
+                .filter(category__in=unique_categories, is_active=True)
+                .only("category", "template")
+            ):
+                if ex.category in label_map:
+                    continue
+                template = ex.template if isinstance(ex.template, dict) else {}
+                label_map[ex.category] = template.get("category_label", ex.category)
+
+        results = [
+            {
+                "category": cp.category,
+                "category_label": label_map.get(cp.category, cp.category),
+                "topic_id": cp.topic_id,
+                "topic_title": cp.topic.title,
+                "accuracy": round(cp.correct_attempts / cp.total_attempts, 2),
+                "total_attempts": cp.total_attempts,
+                "last_attempted_at": cp.last_attempted_at,
+            }
+            for cp in ranked
+        ]
+
+        return Response({"categories": results})
 
 
 # ─── Exercises overview ───────────────────────────────────────────────────────
@@ -1056,10 +1138,9 @@ class DailyTestSubmitView(APIView):
 
             is_correct = False
             correct_display = None
-            expired = False
 
             try:
-                payload = decode_instance_token(instance_token)
+                payload = decode_instance_token(instance_token, max_age=None)
                 grading_data = payload.get("grading_data", payload)
                 is_correct, _ = grade_attempt(
                     exercise.exercise_type, student_answer, grading_data,
@@ -1068,8 +1149,6 @@ class DailyTestSubmitView(APIView):
                     correct_display = _correct_answer_display(
                         exercise.exercise_type, grading_data,
                     )
-            except SignatureExpired:
-                expired = True
             except Exception:
                 pass
 
@@ -1135,12 +1214,19 @@ class TestStartView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Reuse existing in-progress attempt if any
+        # Reuse existing in-progress attempt if any — but abandon stale ones
+        # whose instance tokens may have expired (1-hour default signing TTL,
+        # so a 24-hour staleness threshold is safely past that window).
         attempt = TestAttempt.objects.filter(
             student=request.user,
             test=test,
             status=TestAttempt.Status.IN_PROGRESS,
         ).first()
+
+        if attempt and timezone.now() - attempt.started_at > timedelta(hours=24):
+            attempt.status = TestAttempt.Status.ABANDONED
+            attempt.save(update_fields=["status"])
+            attempt = None
 
         if not attempt:
             # Generate exercises from composition
@@ -1229,21 +1315,20 @@ class TestFinishView(APIView):
                 }
                 continue
 
+            correct_display = None
             try:
                 exercise = Exercise.objects.get(id=exercise_id)
-                payload = decode_instance_token(instance_token)
+                payload = decode_instance_token(instance_token, max_age=None)
                 grading_data = payload.get("grading_data", payload)
-                is_correct, correct_answer = grade_attempt(
+                is_correct, _ = grade_attempt(
                     exercise.exercise_type, student_answer, grading_data
                 )
-            except SignatureExpired:
-                return Response(
-                    {"error": "Testul a expirat. Te rugăm să începi unul nou.", "expired": True},
-                    status=status.HTTP_410_GONE,
-                )
+                if not is_correct:
+                    correct_display = _correct_answer_display(
+                        exercise.exercise_type, grading_data,
+                    )
             except Exception:
                 is_correct = False
-                correct_answer = None
 
             if is_correct:
                 earned_weight += weight
@@ -1251,7 +1336,7 @@ class TestFinishView(APIView):
             graded_answers[str_idx] = {
                 "answer": student_answer,
                 "is_correct": is_correct,
-                "correct_answer": correct_answer,
+                "correct_answer": correct_display,
                 "exercise_id": exercise_id,
             }
 
@@ -1280,6 +1365,51 @@ class TestFinishView(APIView):
         })
 
 
+class TestHistoryView(APIView):
+    """
+    GET /api/v1/progress/test-history/?limit=20
+
+    Returns completed test attempts for the authenticated student, newest first.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            limit = int(request.query_params.get("limit", 20))
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 50))
+
+        attempts = (
+            TestAttempt.objects
+            .filter(student=request.user, status=TestAttempt.Status.COMPLETED)
+            .select_related("test__topic", "test__unit")
+            .order_by("-finished_at")[:limit]
+        )
+
+        results = []
+        for a in attempts:
+            test = a.test
+            if test.scope == Test.Scope.TOPIC:
+                title = test.topic.title if test.topic else ""
+            else:
+                title = test.unit.title if test.unit else ""
+            results.append({
+                "attempt_id": a.id,
+                "test_id": test.id,
+                "test_scope": test.scope,
+                "test_title": title,
+                "score": float(a.score) if a.score is not None else None,
+                "passed": a.passed,
+                "pass_threshold": test.pass_threshold,
+                "started_at": a.started_at,
+                "finished_at": a.finished_at,
+                "exercise_count": len(a.exercise_instances or []),
+            })
+
+        return Response({"attempts": results})
+
+
 class TestResultView(APIView):
     """GET /api/v1/progress/tests/<test_id>/result/"""
     permission_classes = [permissions.IsAuthenticated]
@@ -1300,6 +1430,7 @@ class TestResultView(APIView):
             "passed": attempt.passed,
             "pass_threshold": attempt.test.pass_threshold,
             "answers": attempt.answers,
+            "exercise_instances": attempt.exercise_instances,
             "finished_at": attempt.finished_at,
         })
 
@@ -1331,6 +1462,9 @@ def _build_test_instances(composition: list, exercises_pool) -> list:
                 instance = generate_instance(ex)
                 instance["exercise_id"] = ex.id
                 instance["weight"] = weight
+                instance["topic_id"] = ex.topic_id
+                template = ex.template if isinstance(ex.template, dict) else {}
+                instance["category_label"] = template.get("category_label", ex.category)
                 instances.append(instance)
             except Exception:
                 continue

@@ -88,6 +88,17 @@ export interface MergedTable {
   rows: (string | { text: string; colspan?: number; rowspan?: number })[][];
 }
 
+export interface SymbolReferenceEntry {
+  symbol: string;
+  name: string;
+}
+
+export interface SymbolReference {
+  type: "symbol_reference";
+  title?: string;
+  symbols: SymbolReferenceEntry[];
+}
+
 export interface CollapsibleSection {
   type: "collapsible";
   title: string;
@@ -121,6 +132,7 @@ export type LessonBlock =
   | PropertiesList
   | SummaryTable
   | MergedTable
+  | SymbolReference
   | CollapsibleSection
   | InteractiveComponent;
 

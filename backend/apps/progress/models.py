@@ -107,6 +107,19 @@ class CategoryProgress(models.Model):
         blank=True,
         help_text="Timestamp of last counted failure. Used for 7-day sliding window reset.",
     )
+    total_attempts = models.PositiveIntegerField(
+        default=0,
+        help_text="Total practice attempts logged for this category. Denormalized for fast reads.",
+    )
+    correct_attempts = models.PositiveIntegerField(
+        default=0,
+        help_text="Correct practice attempts logged for this category. Denormalized for fast reads.",
+    )
+    last_attempted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of the most recent practice attempt in this category.",
+    )
 
     class Meta:
         db_table = "category_progress"

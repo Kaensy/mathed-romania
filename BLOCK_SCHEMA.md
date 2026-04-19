@@ -186,6 +186,26 @@ Pre-filled reference table.
 
 ---
 
+### `symbol_reference`
+Compact icon-forward reference panel showing math symbols with Romanian names. Reusable for comparison symbols, operations, set notation, etc.
+```json
+{
+  "type": "symbol_reference",
+  "title": "Simboluri de comparare",
+  "symbols": [
+    { "symbol": "<", "name": "mai mic decât" },
+    { "symbol": "\\leq", "name": "mai mic sau egal" },
+    { "symbol": ">", "name": "mai mare decât" },
+    { "symbol": "\\geq", "name": "mai mare sau egal" },
+    { "symbol": "=", "name": "egal" },
+    { "symbol": "\\neq", "name": "diferit de" }
+  ]
+}
+```
+`title` is optional. Each entry has `symbol` (raw LaTeX — NOT `$`-wrapped, passed directly to `BlockMath`) and `name` (Romanian label, supports inline `$...$`).
+
+---
+
 ### `collapsible`
 Expandable "want to know why?" section for advanced proofs.
 ```json

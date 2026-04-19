@@ -14,6 +14,7 @@ export interface AnswerRecord {
   is_correct: boolean;
   exercise_id: number;
   weight: number;
+  correct_answer?: string | null;
 }
 
 export interface TestAnswerResponse {
@@ -35,4 +36,21 @@ export interface TestResultResponse {
   finished_at: string;
   answers: Record<string, AnswerRecord>;
   exercise_instances: ExerciseInstance[];
+}
+
+export interface TestHistoryAttempt {
+  attempt_id: number;
+  test_id: number;
+  test_scope: "topic" | "unit";
+  test_title: string;
+  score: number | null;
+  passed: boolean | null;
+  pass_threshold: number;
+  started_at: string;
+  finished_at: string;
+  exercise_count: number;
+}
+
+export interface TestHistoryResponse {
+  attempts: TestHistoryAttempt[];
 }

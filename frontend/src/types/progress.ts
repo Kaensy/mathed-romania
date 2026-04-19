@@ -53,6 +53,9 @@ export interface ExerciseInstance {
 
   // category (used for hint tracking)
   category?: string;
+  // Populated by _build_test_instances for test-mode exercises
+  topic_id?: number;
+  category_label?: string;
 }
 
 // ─── Practice session ─────────────────────────────────────────────────────────
@@ -138,6 +141,22 @@ export interface DashboardStats {
   exercises_attempted: number;
   perfect_batches: number;
   units: UnitProgress[];
+}
+
+// ─── Weak categories ──────────────────────────────────────────────────────────
+
+export interface WeakCategory {
+  category: string;
+  category_label: string;
+  topic_id: number;
+  topic_title: string;
+  accuracy: number;
+  total_attempts: number;
+  last_attempted_at: string | null;
+}
+
+export interface WeakCategoriesResponse {
+  categories: WeakCategory[];
 }
 
 // ─── Exercises overview ───────────────────────────────────────────────────────
