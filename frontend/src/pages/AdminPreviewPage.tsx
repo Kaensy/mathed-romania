@@ -163,6 +163,7 @@ export default function AdminPreviewPage() {
   exercise={instance}
   sessionId={null}
   previewMode={true}   // ← add this
+  disableGlossary={true}
   onResult={() => {}}
   onNext={handleNextInstance}
   isLast={false}

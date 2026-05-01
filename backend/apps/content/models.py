@@ -240,23 +240,36 @@ class Test(models.Model):
 
 class GlossaryTerm(models.Model):
     """Mathematical term definitions, cross-referenced with content."""
-    term = models.CharField(max_length=200)
+    class Category(models.TextChoices):
+        DEFINITION = "definition", "Definiție"
+        NOTATION = "notation", "Notație"
+        PROPERTY = "property", "Proprietate"
+        OTHER = "other", "Altele"
+
+    term = models.CharField(max_length=200, unique=True, db_index=True)
+    aliases = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Inflected forms / synonyms used for matching, e.g. [\"numere\", \"numărul\"]",
+    )
     definition = models.TextField()
     unit = models.ForeignKey(
         Unit,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        on_delete=models.PROTECT,
         related_name="glossary_terms",
     )
-    lesson = models.ForeignKey(
-        Lesson,
-        on_delete=models.SET_NULL,
-        null=True,
+    category = models.CharField(
+        max_length=20,
+        choices=Category.choices,
+        default=Category.DEFINITION,
+    )
+    examples = models.JSONField(
+        default=list,
         blank=True,
-        related_name="glossary_terms",
+        help_text="Example strings; KaTeX inline $...$ allowed.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "glossary_terms"

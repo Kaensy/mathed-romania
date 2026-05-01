@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle, XCircle, ChevronRight, Trophy } from "lucide-react";
 import api from "@/api/client";
 import { InlineMath } from "@/lib/math";
+import AutoLinkText from "@/components/AutoLinkText";
 import type { AttemptResult, ExerciseInstance, TierCleared } from "@/types/progress";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -32,6 +33,9 @@ export interface ExerciseCardProps {
   hintActiveForThisCategory?: boolean;
   topicId?: number;
   onHintUsed?: (category: string) => void;
+  // When true, the problem statement renders as plain math/text with
+  // no glossary auto-linking (used in test attempts and admin preview).
+  disableGlossary?: boolean;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -46,7 +50,9 @@ export default function ExerciseCard({
   hintActiveForThisCategory = false,
   topicId,
   onHintUsed,
+  disableGlossary = false,
 }: ExerciseCardProps) {
+  const linkedTerms = new Set<number>();
   const initAnswer = (): string | string[] | Record<string, string> => {
     if (exercise.exercise_type === "drag_order") {
       // drag_number: empty slots; drag_order: shuffled item list
@@ -181,7 +187,11 @@ export default function ExerciseCard({
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
       {/* Question */}
       <div className="text-lg font-medium text-gray-800 mb-6 leading-relaxed">
-        <InlineMath text={exercise.question} />
+        {disableGlossary ? (
+          <InlineMath text={exercise.question} />
+        ) : (
+          <AutoLinkText text={exercise.question} linkedTerms={linkedTerms} />
+        )}
       </div>
 
       {/* Hint button */}

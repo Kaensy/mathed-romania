@@ -145,12 +145,6 @@ export interface Exercise {
   template: Record<string, unknown>;
 }
 
-export interface GlossaryTerm {
-  id: number;
-  term: string;
-  definition: string;
-}
-
 export interface TestInfo {
   id: number;
   scope: string;
@@ -200,7 +194,6 @@ export interface LessonDetail {
   // Navigation
   prev_lesson_id: number | null;
   next_lesson_id: number | null;
-  glossary_terms: GlossaryTerm[];
   updated_at: string;
 }
 

@@ -59,6 +59,12 @@ export default function DashboardPage() {
               />
             )}
             <Link
+              to="/glossary"
+              className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+            >
+              Glosar
+            </Link>
+            <Link
               to="/profile"
               className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
             >

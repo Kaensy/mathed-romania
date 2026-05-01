@@ -16,10 +16,20 @@ class ExerciseSerializer(serializers.ModelSerializer):
         fields = ["id", "exercise_type", "difficulty", "template"]
 
 
+class GlossaryUnitSerializer(serializers.ModelSerializer):
+    grade_number = serializers.IntegerField(source="grade.number", read_only=True)
+
+    class Meta:
+        model = Unit
+        fields = ["id", "grade_number", "order", "title"]
+
+
 class GlossaryTermSerializer(serializers.ModelSerializer):
+    unit = GlossaryUnitSerializer(read_only=True)
+
     class Meta:
         model = GlossaryTerm
-        fields = ["id", "term", "definition"]
+        fields = ["id", "term", "aliases", "definition", "category", "examples", "unit"]
 
 
 class TestSerializer(serializers.ModelSerializer):
@@ -105,7 +115,6 @@ class LessonDetailSerializer(serializers.ModelSerializer):
     grade_number = serializers.IntegerField(source="topic.unit.grade.number", read_only=True)
     prev_lesson_id = serializers.SerializerMethodField()
     next_lesson_id = serializers.SerializerMethodField()
-    glossary_terms = GlossaryTermSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lesson
@@ -115,7 +124,6 @@ class LessonDetailSerializer(serializers.ModelSerializer):
             "topic_exercise_count",
             "unit_id", "unit_title", "unit_order", "grade_number",
             "prev_lesson_id", "next_lesson_id",
-            "glossary_terms",
             "updated_at",
         ]
 

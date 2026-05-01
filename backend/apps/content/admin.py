@@ -229,3 +229,16 @@ class ExerciseAdmin(admin.ModelAdmin):
             return "Salvează exercițiul mai întâi."
         url = f"{settings.FRONTEND_URL}/admin-preview/exercise/{obj.pk}"
         return format_html('<a href="{}" target="_blank">🔍 Preview</a>', url)
+
+
+# ─── GlossaryTerm ─────────────────────────────────────────────────────────────
+
+@admin.register(GlossaryTerm)
+class GlossaryTermAdmin(admin.ModelAdmin):
+    list_display = ("term", "unit", "category", "alias_count")
+    list_filter = ("unit", "category")
+    search_fields = ("term", "definition")
+
+    @admin.display(description="Aliases")
+    def alias_count(self, obj):
+        return len(obj.aliases or [])

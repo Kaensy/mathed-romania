@@ -289,7 +289,7 @@ class LessonDetailView(APIView):
     """
     GET /api/v1/content/lessons/<lesson_id>/
 
-    Full lesson with content blocks and glossary terms.
+    Full lesson with content blocks.
     Returns 403 if the lesson is locked for this student.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -298,8 +298,6 @@ class LessonDetailView(APIView):
         try:
             lesson = Lesson.objects.select_related(
                 "topic__unit__grade",
-            ).prefetch_related(
-                "glossary_terms",
             ).get(id=lesson_id, is_published=True)
         except Lesson.DoesNotExist:
             return Response({"error": "Lesson not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -325,23 +323,17 @@ class LessonDetailView(APIView):
 class GlossaryListView(APIView):
     """
     GET /api/v1/content/glossary/
-    GET /api/v1/content/glossary/?unit=<unit_id>
-    GET /api/v1/content/glossary/?search=<query>
 
-    Searchable glossary of mathematical terms.
+    Flat list of glossary terms whose unit is published.
+    Filtering and Romanian-aware sorting happen client-side.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        terms = GlossaryTerm.objects.all()
-
-        unit_id = request.query_params.get("unit")
-        if unit_id:
-            terms = terms.filter(unit_id=unit_id)
-
-        search = request.query_params.get("search")
-        if search:
-            terms = terms.filter(term__icontains=search)
-
+        terms = (
+            GlossaryTerm.objects
+            .filter(unit__is_published=True)
+            .select_related("unit__grade")
+        )
         serializer = GlossaryTermSerializer(terms, many=True)
         return Response(serializer.data)

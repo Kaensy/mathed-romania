@@ -1,5 +1,9 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { GlossaryProvider } from "@/contexts/GlossaryContext";
+import { GlossaryDrawerProvider } from "@/contexts/GlossaryDrawerContext";
+import GlossaryDrawer from "@/components/GlossaryDrawer";
+import GlossaryFab from "@/components/GlossaryFab";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -18,6 +22,7 @@ import TestsOverviewPage from "@/pages/TestsOverviewPage";
 import AdminPreviewPage from "@/pages/AdminPreviewPage";
 import ProfilePage from "@/pages/ProfilePage";
 import TestHistoryPage from "@/pages/TestHistoryPage";
+import GlossaryPage from "@/pages/GlossaryPage";
 
 /**
  * Redirects authenticated users away from auth pages (login, register).
@@ -70,6 +75,7 @@ function AppRoutes() {
       <Route path="/topic/:topicId/practice"  element={<PracticePage />} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/test-history" element={<ProtectedRoute><TestHistoryPage /></ProtectedRoute>} />
+      <Route path="/glossary" element={<ProtectedRoute><GlossaryPage /></ProtectedRoute>} />
 
 
       {/* Default redirect */}
@@ -82,7 +88,13 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <GlossaryProvider>
+        <GlossaryDrawerProvider>
+          <AppRoutes />
+          <GlossaryFab />
+          <GlossaryDrawer />
+        </GlossaryDrawerProvider>
+      </GlossaryProvider>
     </AuthProvider>
   );
 }
