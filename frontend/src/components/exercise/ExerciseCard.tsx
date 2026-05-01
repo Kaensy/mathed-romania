@@ -52,7 +52,6 @@ export default function ExerciseCard({
   onHintUsed,
   disableGlossary = false,
 }: ExerciseCardProps) {
-  const linkedTerms = new Set<number>();
   const initAnswer = (): string | string[] | Record<string, string> => {
     if (exercise.exercise_type === "drag_order") {
       // drag_number: empty slots; drag_order: shuffled item list
@@ -190,7 +189,7 @@ export default function ExerciseCard({
         {disableGlossary ? (
           <InlineMath text={exercise.question} />
         ) : (
-          <AutoLinkText text={exercise.question} linkedTerms={linkedTerms} />
+          <AutoLinkText text={exercise.question} />
         )}
       </div>
 

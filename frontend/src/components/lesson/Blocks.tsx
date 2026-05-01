@@ -28,10 +28,9 @@ import type {
 // ─── Paragraph ────────────────────────────────────────────────────────────────
 
 export function ParagraphBlockComponent({ block }: { block: ParagraphBlock }) {
-  const linkedTerms = new Set<number>();
   return (
     <p className="text-gray-800 leading-relaxed text-base my-4">
-      <AutoLinkText text={block.text} linkedTerms={linkedTerms} />
+      <AutoLinkText text={block.text} />
     </p>
   );
 }
@@ -39,17 +38,16 @@ export function ParagraphBlockComponent({ block }: { block: ParagraphBlock }) {
 // ─── Definition Box ───────────────────────────────────────────────────────────
 
 export function DefinitionBoxComponent({ block }: { block: DefinitionBox }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5 border-l-4 border-blue-500 bg-blue-50 rounded-r-lg p-4">
       <div className="flex items-center gap-2 mb-2">
         <BookOpen className="w-4 h-4 text-blue-600 shrink-0" />
         <span className="text-blue-700 font-semibold text-sm uppercase tracking-wide">
-          <AutoLinkText text={block.title ?? "Definiție"} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title ?? "Definiție"} />
         </span>
       </div>
       <p className="text-gray-800 leading-relaxed">
-        <AutoLinkText text={block.text} linkedTerms={linkedTerms} />
+        <AutoLinkText text={block.text} />
       </p>
     </div>
   );
@@ -58,17 +56,16 @@ export function DefinitionBoxComponent({ block }: { block: DefinitionBox }) {
 // ─── Observation Box ──────────────────────────────────────────────────────────
 
 export function ObservationBoxComponent({ block }: { block: ObservationBox }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5 border border-amber-200 bg-amber-50 rounded-lg p-4">
       <div className="flex items-center gap-2 mb-2">
         <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" />
         <span className="text-amber-700 font-semibold text-sm uppercase tracking-wide">
-          <AutoLinkText text={block.title ?? "Observație"} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title ?? "Observație"} />
         </span>
       </div>
       <p className="text-gray-700 leading-relaxed">
-        <AutoLinkText text={block.text} linkedTerms={linkedTerms} />
+        <AutoLinkText text={block.text} />
       </p>
     </div>
   );
@@ -77,12 +74,11 @@ export function ObservationBoxComponent({ block }: { block: ObservationBox }) {
 // ─── Formula Card ─────────────────────────────────────────────────────────────
 
 export function FormulaCardComponent({ block }: { block: FormulaCard }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-6 border-2 border-indigo-300 bg-indigo-50 rounded-xl p-5 text-center shadow-sm">
       {block.title && (
         <p className="text-indigo-600 font-semibold text-sm uppercase tracking-wider mb-3">
-          <AutoLinkText text={block.title} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title} />
         </p>
       )}
       <BlockMath latex={block.latex} className="text-lg" />
@@ -93,7 +89,6 @@ export function FormulaCardComponent({ block }: { block: FormulaCard }) {
 // ─── Real World Box ───────────────────────────────────────────────────────────
 
 export function RealWorldBoxComponent({ block }: { block: RealWorldBox }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5 border border-green-200 bg-green-50 rounded-lg p-4">
       <div className="flex items-center gap-2 mb-2">
@@ -103,7 +98,7 @@ export function RealWorldBoxComponent({ block }: { block: RealWorldBox }) {
         </span>
       </div>
       <p className="text-gray-700 leading-relaxed">
-        <AutoLinkText text={block.text} linkedTerms={linkedTerms} />
+        <AutoLinkText text={block.text} />
       </p>
     </div>
   );
@@ -112,17 +107,16 @@ export function RealWorldBoxComponent({ block }: { block: RealWorldBox }) {
 // ─── Warning Box ──────────────────────────────────────────────────────────────
 
 export function WarningBoxComponent({ block }: { block: WarningBox }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5 border-l-4 border-red-400 bg-red-50 rounded-r-lg p-4">
       <div className="flex items-center gap-2 mb-2">
         <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
         <span className="text-red-600 font-semibold text-sm uppercase tracking-wide">
-          <AutoLinkText text={block.title ?? "Atenție!"} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title ?? "Atenție!"} />
         </span>
       </div>
       <p className="text-gray-700 leading-relaxed">
-        <AutoLinkText text={block.text} linkedTerms={linkedTerms} />
+        <AutoLinkText text={block.text} />
       </p>
     </div>
   );
@@ -143,7 +137,6 @@ export function BlockEquationComponent({ block }: { block: BlockEquation }) {
 export function WorkedExampleComponent({ block }: { block: WorkedExample }) {
   const [visibleSteps, setVisibleSteps] = useState(0);
   const allVisible = visibleSteps >= block.steps.length;
-  const linkedTerms = new Set<number>();
 
   return (
     <div className="my-6 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -157,7 +150,7 @@ export function WorkedExampleComponent({ block }: { block: WorkedExample }) {
       {/* Problem */}
       <div className="px-5 py-4 bg-white border-b border-gray-100">
         <p className="font-semibold text-gray-800">
-          <AutoLinkText text={block.problem} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.problem} />
         </p>
       </div>
 
@@ -171,7 +164,7 @@ export function WorkedExampleComponent({ block }: { block: WorkedExample }) {
             <div className="flex-1 space-y-2">
               {step.explanation && (
                 <p className="text-gray-700">
-                  <AutoLinkText text={step.explanation} linkedTerms={linkedTerms} />
+                  <AutoLinkText text={step.explanation} />
                 </p>
               )}
               {step.latex && (
@@ -220,7 +213,6 @@ export function WorkedExampleComponent({ block }: { block: WorkedExample }) {
 export function WorkedExampleMultiComponent({ block }: { block: WorkedExampleMulti }) {
   const [activeMethod, setActiveMethod] = useState(0);
   const [visibleSteps, setVisibleSteps] = useState(0);
-  const linkedTerms = new Set<number>();
   const method = block.methods[activeMethod];
     if (!method) return null;
     const allVisible = visibleSteps >= method.steps.length;
@@ -243,7 +235,7 @@ export function WorkedExampleMultiComponent({ block }: { block: WorkedExampleMul
       {/* Problem */}
       <div className="px-5 py-4 bg-white border-b border-gray-100">
         <p className="font-semibold text-gray-800">
-          <AutoLinkText text={block.problem} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.problem} />
         </p>
       </div>
 
@@ -274,7 +266,7 @@ export function WorkedExampleMultiComponent({ block }: { block: WorkedExampleMul
             <div className="flex-1 space-y-2">
               {step.explanation && (
                 <p className="text-gray-700">
-                  <AutoLinkText text={step.explanation} linkedTerms={linkedTerms} />
+                  <AutoLinkText text={step.explanation} />
                 </p>
               )}
               {step.latex && (
@@ -320,25 +312,24 @@ export function WorkedExampleMultiComponent({ block }: { block: WorkedExampleMul
 // ─── Properties List ──────────────────────────────────────────────────────────
 
 export function PropertiesListComponent({ block }: { block: PropertiesList }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5">
       {block.title && (
         <h4 className="font-semibold text-gray-700 mb-3">
-          <AutoLinkText text={block.title} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title} />
         </h4>
       )}
       <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
         {block.properties.map((prop, i) => (
           <div key={i} className="grid grid-cols-3 text-sm">
             <div className="px-4 py-3 font-medium text-gray-700 bg-gray-50">
-              <AutoLinkText text={prop.name} linkedTerms={linkedTerms} />
+              <AutoLinkText text={prop.name} />
             </div>
             <div className="px-4 py-3 text-center overflow-x-auto">
               <BlockMath latex={prop.symbolic} />
             </div>
             <div className="px-4 py-3 text-gray-600">
-              <AutoLinkText text={prop.example ?? ""} linkedTerms={linkedTerms} />
+              <AutoLinkText text={prop.example ?? ""} />
             </div>
           </div>
         ))}
@@ -350,12 +341,11 @@ export function PropertiesListComponent({ block }: { block: PropertiesList }) {
 // ─── Summary Table ────────────────────────────────────────────────────────────
 
 export function SummaryTableComponent({ block }: { block: SummaryTable }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5 overflow-x-auto">
       {block.title && (
         <p className="text-sm font-semibold text-gray-600 mb-2">
-          <AutoLinkText text={block.title} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title} />
         </p>
       )}
       <table className="w-full text-sm border-collapse border border-gray-200 rounded-lg overflow-hidden">
@@ -363,7 +353,7 @@ export function SummaryTableComponent({ block }: { block: SummaryTable }) {
           <tr className="bg-gray-100">
             {block.headers.map((header, i) => (
               <th key={i} className="px-4 py-2 text-left font-semibold text-gray-700 border border-gray-200">
-                <AutoLinkText text={header} linkedTerms={linkedTerms} />
+                <AutoLinkText text={header} />
               </th>
             ))}
           </tr>
@@ -373,7 +363,7 @@ export function SummaryTableComponent({ block }: { block: SummaryTable }) {
             <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
               {row.map((cell, j) => (
                 <td key={j} className="px-4 py-2 text-gray-700 border border-gray-200">
-                  <AutoLinkText text={cell} linkedTerms={linkedTerms} />
+                  <AutoLinkText text={cell} />
                 </td>
               ))}
             </tr>
@@ -387,12 +377,11 @@ export function SummaryTableComponent({ block }: { block: SummaryTable }) {
 // ─── Symbol Reference ─────────────────────────────────────────────────────────
 
 export function SymbolReferenceComponent({ block }: { block: SymbolReference }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5 border border-gray-200 bg-gray-50 rounded-lg p-4">
       {block.title && (
         <h4 className="text-sm font-semibold text-gray-700 mb-3">
-          <AutoLinkText text={block.title} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title} />
         </h4>
       )}
       <div className="flex flex-wrap gap-3">
@@ -403,7 +392,7 @@ export function SymbolReferenceComponent({ block }: { block: SymbolReference }) 
           >
             <BlockMath latex={entry.symbol} className="text-lg" />
             <div className="text-xs text-gray-500 mt-1">
-              <AutoLinkText text={entry.name} linkedTerms={linkedTerms} />
+              <AutoLinkText text={entry.name} />
             </div>
           </div>
         ))}
@@ -416,7 +405,6 @@ export function SymbolReferenceComponent({ block }: { block: SymbolReference }) 
 
 export function CollapsibleSectionComponent({ block }: { block: CollapsibleSection }) {
   const [open, setOpen] = useState(false);
-  const linkedTerms = new Set<number>();
 
   return (
     <div className="my-5 border border-purple-200 rounded-lg overflow-hidden">
@@ -430,7 +418,7 @@ export function CollapsibleSectionComponent({ block }: { block: CollapsibleSecti
           <ChevronRight className="w-4 h-4 text-purple-500 shrink-0" />
         )}
         <span className="text-purple-700 font-medium text-sm">
-          <AutoLinkText text={block.title} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title} />
         </span>
       </button>
       {open && (
@@ -481,12 +469,11 @@ export function MergedTableComponent({ block }: {
     footer_groups?: { label: string; columns: number }[];
   }
 }) {
-  const linkedTerms = new Set<number>();
   return (
     <div className="my-5 overflow-x-auto">
       {block.title && (
         <p className="text-sm font-semibold text-gray-600 mb-2">
-          <AutoLinkText text={block.title} linkedTerms={linkedTerms} />
+          <AutoLinkText text={block.title} />
         </p>
       )}
       <table className="text-sm border-collapse border border-gray-300 rounded-lg overflow-hidden min-w-full">
@@ -498,7 +485,7 @@ export function MergedTableComponent({ block }: {
                 colSpan={group.columns}
                 className="px-3 py-2 text-center font-semibold text-indigo-700 border border-gray-300 text-xs"
               >
-                <AutoLinkText text={group.label} linkedTerms={linkedTerms} />
+                <AutoLinkText text={group.label} />
               </th>
             ))}
           </tr>
@@ -508,7 +495,7 @@ export function MergedTableComponent({ block }: {
                 key={i}
                 className="px-3 py-2 text-center font-medium text-gray-600 border border-gray-300 text-xs"
               >
-                <AutoLinkText text={header} linkedTerms={linkedTerms} />
+                <AutoLinkText text={header} />
               </th>
             ))}
           </tr>
@@ -521,7 +508,7 @@ export function MergedTableComponent({ block }: {
                   key={j}
                   className="px-3 py-2 text-center text-gray-700 border border-gray-300 font-mono"
                 >
-                  <AutoLinkText text={cell} linkedTerms={linkedTerms} />
+                  <AutoLinkText text={cell} />
                 </td>
               ))}
             </tr>
@@ -536,7 +523,7 @@ export function MergedTableComponent({ block }: {
                   colSpan={group.columns}
                   className="px-3 py-2 text-center text-blue-700 border border-gray-300 text-xs italic"
                 >
-                  <AutoLinkText text={group.label} linkedTerms={linkedTerms} />
+                  <AutoLinkText text={group.label} />
                 </td>
               ))}
             </tr>

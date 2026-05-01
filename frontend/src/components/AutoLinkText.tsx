@@ -7,18 +7,10 @@ import type { GlossaryTerm } from "@/types/glossary";
 
 interface AutoLinkTextProps {
   text: string;
-  // Mutated: tracks which term ids have already been auto-linked in
-  // the current block so subsequent occurrences fall back to plain
-  // text. The parent owns the Set's lifetime (one per block).
-  linkedTerms?: Set<number>;
   className?: string;
 }
 
-export default function AutoLinkText({
-  text,
-  linkedTerms,
-  className,
-}: AutoLinkTextProps) {
+export default function AutoLinkText({ text, className }: AutoLinkTextProps) {
   const { terms, isReady } = useGlossary();
   const { openDrawer } = useGlossaryDrawer();
 
@@ -28,6 +20,11 @@ export default function AutoLinkText({
     for (const t of terms) m.set(t.id, t);
     return m;
   }, [terms]);
+
+  // Per-render dedup: each AutoLinkText invocation gets its own Set,
+  // so StrictMode's double-render starts fresh each pass and siblings
+  // don't share mutable state.
+  const linked = new Set<number>();
 
   // Split off any inline `$…$` math first so the matcher only ever
   // sees plain prose. Math segments render via KaTeX HTML, identical
@@ -68,9 +65,8 @@ export default function AutoLinkText({
         );
       }
       const span = part.slice(m.start, m.end);
-      const alreadyLinked = linkedTerms?.has(m.termId);
 
-      if (alreadyLinked) {
+      if (linked.has(m.termId)) {
         out.push(<span key={`l${key++}`}>{span}</span>);
       } else {
         const term = termById.get(m.termId);
@@ -87,7 +83,7 @@ export default function AutoLinkText({
             {span}
           </button>,
         );
-        if (linkedTerms) linkedTerms.add(termId);
+        linked.add(termId);
       }
       cursor = m.end;
     }
