@@ -2,16 +2,20 @@
 Streak service for MathEd Romania.
 
 Public API:
-    record_activity(user, activity_type) -> dict
+    record_activity(user, activity_type) -> list[str]
 
 All dates are computed in Europe/Bucharest local time.
 """
+import logging
 from zoneinfo import ZoneInfo
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from .badges.service import evaluate_badges_for_event
 from .models import Streak, StreakActivity
+
+logger = logging.getLogger(__name__)
 
 BUCHAREST_TZ = ZoneInfo("Europe/Bucharest")
 MAX_FREEZES = 2
@@ -21,21 +25,8 @@ def _today_local():
     return timezone.now().astimezone(BUCHAREST_TZ).date()
 
 
-def _idempotent_payload(streak):
-    return {
-        "current_streak": streak.current_streak,
-        "longest_streak": streak.longest_streak,
-        "freeze_count": streak.freeze_count,
-        "freeze_used": False,
-        "freeze_earned": False,
-        "is_new_activity": False,
-    }
-
-
-def record_activity(user, activity_type: str) -> dict:
+def record_activity(user, activity_type: str) -> list[str]:
     today = _today_local()
-    freeze_used = False
-    freeze_earned = False
 
     try:
         with transaction.atomic():
@@ -51,13 +42,12 @@ def record_activity(user, activity_type: str) -> dict:
             else:
                 gap = (today - last).days
                 if gap <= 0:
-                    return _idempotent_payload(streak)
+                    return _evaluate_streak_badges(user, streak)
                 if gap == 1:
                     streak.current_streak += 1
                 elif gap == 2 and streak.freeze_count > 0:
                     streak.freeze_count -= 1
                     streak.current_streak += 1
-                    freeze_used = True
                 else:
                     streak.current_streak = 1
 
@@ -70,19 +60,19 @@ def record_activity(user, activity_type: str) -> dict:
                 and streak.freeze_count < MAX_FREEZES
             ):
                 streak.freeze_count += 1
-                freeze_earned = True
 
             streak.last_active_date = today
             streak.save()
     except IntegrityError:
         streak, _ = Streak.objects.get_or_create(student=user)
-        return _idempotent_payload(streak)
+        return _evaluate_streak_badges(user, streak)
 
-    return {
-        "current_streak": streak.current_streak,
-        "longest_streak": streak.longest_streak,
-        "freeze_count": streak.freeze_count,
-        "freeze_used": freeze_used,
-        "freeze_earned": freeze_earned,
-        "is_new_activity": True,
-    }
+    return _evaluate_streak_badges(user, streak)
+
+
+def _evaluate_streak_badges(user, streak) -> list[str]:
+    try:
+        return evaluate_badges_for_event(user, "streak_updated", {"streak": streak})
+    except Exception:
+        logger.warning("Badge evaluation failed", exc_info=True)
+        return []

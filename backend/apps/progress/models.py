@@ -282,3 +282,23 @@ class DailyTestSession(models.Model):
     def __str__(self):
         status = "✓" if self.is_completed else f"{len(self.completed_indices)}/5"
         return f"{self.student.email} — {self.date} ({status})"
+
+
+class Achievement(models.Model):
+    """Records each badge a student has earned. One row per (student, badge_key)."""
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="achievements",
+        limit_choices_to={"user_type": "student"},
+    )
+    badge_key = models.CharField(max_length=64)
+    earned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "achievement"
+        unique_together = [("student", "badge_key")]
+
+    def __str__(self):
+        return f"{self.student.email} — {self.badge_key}"

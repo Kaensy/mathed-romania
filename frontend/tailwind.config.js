@@ -22,6 +22,15 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
       },
+      keyframes: {
+        "badge-toast-in": {
+          "0%": { opacity: "0", transform: "translate(-50%, 24px)" },
+          "100%": { opacity: "1", transform: "translate(-50%, 0)" },
+        },
+      },
+      animation: {
+        "badge-toast-in": "badge-toast-in 280ms cubic-bezier(0.22, 1, 0.36, 1)",
+      },
     },
   },
   plugins: [],

@@ -71,6 +71,11 @@ export default function GlossaryPage() {
       .catch(() => setError("Nu am putut încărca glosarul. Reîncearcă mai târziu."));
   }, []);
 
+  // Fire glossary-opened ping (badge eval is server-side; idempotent).
+  useEffect(() => {
+    api.post("/content/glossary/opened/").catch(() => {});
+  }, []);
+
   // Debounce search input ~150ms.
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), 150);

@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 
+import api from "@/api/client";
+
 interface GlossaryDrawerContextType {
   isOpen: boolean;
   focusedTermId: number | null;
@@ -24,6 +26,7 @@ export function GlossaryDrawerProvider({ children }: { children: ReactNode }) {
   const openDrawer = useCallback((termId?: number) => {
     setFocusedTermId(typeof termId === "number" ? termId : null);
     setIsOpen(true);
+    api.post("/content/glossary/opened/").catch(() => {});
   }, []);
 
   const closeDrawer = useCallback(() => {

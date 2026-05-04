@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     GlossaryListView,
+    GlossaryOpenedView,
     GradeDetailView,
     GradeListView,
     LessonDetailView,
@@ -14,4 +15,5 @@ urlpatterns = [
     path("units/<int:unit_id>/", UnitDetailView.as_view(), name="unit_detail"),
     path("lessons/<int:lesson_id>/", LessonDetailView.as_view(), name="lesson_detail"),
     path("glossary/", GlossaryListView.as_view(), name="glossary_list"),
+    path("glossary/opened/", GlossaryOpenedView.as_view(), name="glossary_opened"),
 ]

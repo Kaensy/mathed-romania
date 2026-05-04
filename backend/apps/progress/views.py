@@ -41,6 +41,7 @@ from apps.progress.serializers import (
     DashboardSerializer,
     StreakSerializer,
 )
+from apps.progress.badges.service import evaluate_badges_for_event, serialize_badges
 from apps.progress.streak_service import _today_local, record_activity
 
 logger = logging.getLogger(__name__)
@@ -69,9 +70,10 @@ class LessonOpenView(APIView):
             defaults={"status": LessonProgress.Status.IN_PROGRESS},
         )
 
+        streak_badges: list[str] = []
         if created:
             try:
-                record_activity(request.user, "lesson")
+                streak_badges = record_activity(request.user, "lesson")
             except Exception:
                 logger.warning("Streak update failed", exc_info=True)
 
@@ -79,7 +81,19 @@ class LessonOpenView(APIView):
             progress.status = LessonProgress.Status.IN_PROGRESS
             progress.save(update_fields=["status"])
 
-        return Response({"lesson_id": lesson_id, "status": progress.status})
+        own_badges: list[str] = []
+        try:
+            own_badges = evaluate_badges_for_event(
+                request.user, "lesson_opened", {"lesson": lesson},
+            )
+        except Exception:
+            logger.warning("Badge evaluation failed", exc_info=True)
+
+        return Response({
+            "lesson_id": lesson_id,
+            "status": progress.status,
+            "newly_earned_badges": serialize_badges(streak_badges + own_badges),
+        })
 
 
 # ─── Lesson complete ──────────────────────────────────────────────────────────
@@ -368,8 +382,9 @@ class ExerciseAttemptView(APIView):
             session_id=session_id,
         )
 
+        streak_badges: list[str] = []
         try:
-            record_activity(request.user, "exercise")
+            streak_badges = record_activity(request.user, "exercise")
         except Exception:
             logger.warning("Streak update failed", exc_info=True)
 
@@ -429,6 +444,14 @@ class ExerciseAttemptView(APIView):
 
         correct_display = _correct_answer_display(exercise.exercise_type, grading_data) if not is_correct else None
 
+        own_badges: list[str] = []
+        try:
+            own_badges = evaluate_badges_for_event(
+                request.user, "exercise_attempted", None,
+            )
+        except Exception:
+            logger.warning("Badge evaluation failed", exc_info=True)
+
         return Response({
             "is_correct": is_correct,
             "correct_answer": correct_display,
@@ -436,6 +459,7 @@ class ExerciseAttemptView(APIView):
             "tier_cleared": tier_cleared,
             "hint_active_for_category": hint_active_for_category,
             "error": error if not is_correct else None,
+            "newly_earned_badges": serialize_badges(streak_badges + own_badges),
         })
 
     def _check_tier_cleared(self, user, session_id, exercise):
@@ -1175,12 +1199,13 @@ class DailyTestSubmitView(APIView):
         session.completed_indices = sorted(completed_set)
 
         total = len(instances)
+        streak_badges: list[str] = []
         if total > 0 and len(completed_set) == total:
             session.is_completed = True
             session.completed_at = timezone.now()
             session.save()
             try:
-                record_activity(request.user, "daily_test")
+                streak_badges = record_activity(request.user, "daily_test")
             except Exception:
                 logger.warning("Streak update failed", exc_info=True)
         else:
@@ -1192,6 +1217,7 @@ class DailyTestSubmitView(APIView):
             "completed_count": len(session.completed_indices),
             "total_count": total,
             "pending_exercises": regenerated_pending,
+            "newly_earned_badges": serialize_badges(streak_badges),
         })
 
 
@@ -1350,11 +1376,20 @@ class TestFinishView(APIView):
         attempt.finished_at = timezone.now()
         attempt.save()
 
+        streak_badges: list[str] = []
         try:
             act_type = "topic_test" if test.scope == "topic" else "unit_test"
-            record_activity(request.user, act_type)
+            streak_badges = record_activity(request.user, act_type)
         except Exception:
             logger.warning("Streak update failed", exc_info=True)
+
+        own_badges: list[str] = []
+        try:
+            own_badges = evaluate_badges_for_event(
+                request.user, "test_finished", {"test_attempt": attempt},
+            )
+        except Exception:
+            logger.warning("Badge evaluation failed", exc_info=True)
 
         return Response({
             "attempt_id": attempt.id,
@@ -1362,6 +1397,7 @@ class TestFinishView(APIView):
             "passed": passed,
             "pass_threshold": test.pass_threshold,
             "answers": graded_answers,
+            "newly_earned_badges": serialize_badges(streak_badges + own_badges),
         })
 
 
@@ -1525,3 +1561,52 @@ def _correct_answer_display(exercise_type: str, grading_data: dict) -> str:
     elif exercise_type == "drag_order":
         return ", ".join(str(x) for x in grading_data.get("correct_order", []))
     return ""
+
+
+# ─── Achievements ─────────────────────────────────────────────────────────────
+
+class AchievementListView(APIView):
+    """
+    GET /api/v1/progress/achievements/
+
+    Catalog-shaped list of every badge with the student's earned state.
+    Secret badges that haven't been earned yet are returned with name,
+    description, and icon_name nulled so the frontend can render the
+    mystery placeholder.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.progress.badges.catalog import CATALOG
+        from apps.progress.models import Achievement
+
+        user = request.user
+        if not getattr(user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au insigne."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        earned_at_by_key = dict(
+            Achievement.objects
+            .filter(student=user)
+            .values_list("badge_key", "earned_at")
+        )
+
+        achievements = []
+        for badge in CATALOG.values():
+            earned_at = earned_at_by_key.get(badge.key)
+            earned = earned_at is not None
+            hidden = badge.secret and not earned
+            achievements.append({
+                "key": badge.key,
+                "family": badge.family,
+                "secret": badge.secret,
+                "earned": earned,
+                "earned_at": earned_at.isoformat() if earned_at else None,
+                "name": None if hidden else badge.name,
+                "description": None if hidden else badge.description,
+                "icon_name": None if hidden else badge.icon_name,
+            })
+
+        return Response({"achievements": achievements})

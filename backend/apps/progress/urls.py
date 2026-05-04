@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AchievementListView,
     DailyTestStartView,
     DailyTestSubmitView,
     DailyTestView,
@@ -59,4 +60,7 @@ urlpatterns = [
     path("daily/", DailyTestView.as_view(), name="daily_test"),
     path("daily/start/", DailyTestStartView.as_view(), name="daily_test_start"),
     path("daily/submit/", DailyTestSubmitView.as_view(), name="daily_test_submit"),
+
+    # Achievements
+    path("achievements/", AchievementListView.as_view(), name="achievement_list"),
 ]

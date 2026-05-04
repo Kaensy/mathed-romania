@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    Achievement,
     CategoryProgress,
     ClassroomPace,
     DailyTestSession,
@@ -57,3 +58,9 @@ class DailyTestSessionAdmin(admin.ModelAdmin):
     list_display = ("student", "date", "is_completed", "completed_at")
     list_filter = ("is_completed", "date")
     readonly_fields = ("exercise_instances", "completed_indices", "completed_at", "created_at")
+
+
+@admin.register(Achievement)
+class AchievementAdmin(admin.ModelAdmin):
+    list_display = ("student", "badge_key", "earned_at")
+    list_filter = ("badge_key",)

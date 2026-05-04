@@ -4,6 +4,7 @@ Content API views for MathEd Romania.
 These endpoints serve curriculum content to authenticated students/teachers.
 All content is read-only via the API — creation/editing happens in Django admin.
 """
+import logging
 from collections import defaultdict
 
 from django.db.models import Count, Max, Q
@@ -33,6 +34,8 @@ from .serializers import (
     LessonDetailSerializer,
     UnitListSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _build_progress_context(request_user, all_lessons, all_tests, topic_ids):
@@ -337,3 +340,27 @@ class GlossaryListView(APIView):
         )
         serializer = GlossaryTermSerializer(terms, many=True)
         return Response(serializer.data)
+
+
+class GlossaryOpenedView(APIView):
+    """
+    POST /api/v1/content/glossary/opened/
+
+    Idempotent ping the frontend fires whenever the glossary drawer opens.
+    Awards the discovery "Bibliotecar" badge on first open and returns any
+    newly-earned badges so the client can pop a toast.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from apps.progress.badges.service import (
+            evaluate_badges_for_event,
+            serialize_badges,
+        )
+
+        keys: list[str] = []
+        try:
+            keys = evaluate_badges_for_event(request.user, "glossary_opened")
+        except Exception:
+            logger.warning("Badge evaluation failed", exc_info=True)
+        return Response({"newly_earned_badges": serialize_badges(keys)})

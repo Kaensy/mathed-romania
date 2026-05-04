@@ -8,6 +8,7 @@ import type { DailyTestResponse } from "@/types/daily";
 import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
+import RecentBadgesWidget from "@/components/badges/RecentBadgesWidget";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -140,6 +141,9 @@ export default function DashboardPage() {
             </div>
           </section>
         )}
+
+        {/* Recent badges */}
+        {user.user_type === "student" && <RecentBadgesWidget />}
 
         {/* Navigation cards */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

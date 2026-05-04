@@ -2,8 +2,10 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { GlossaryDrawerProvider } from "@/contexts/GlossaryDrawerContext";
+import { BadgeNotificationProvider } from "@/contexts/BadgeNotificationContext";
 import GlossaryDrawer from "@/components/GlossaryDrawer";
 import GlossaryFab from "@/components/GlossaryFab";
+import BadgeToast from "@/components/badges/BadgeToast";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -88,13 +90,16 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <GlossaryProvider>
-        <GlossaryDrawerProvider>
-          <AppRoutes />
-          <GlossaryFab />
-          <GlossaryDrawer />
-        </GlossaryDrawerProvider>
-      </GlossaryProvider>
+      <BadgeNotificationProvider>
+        <GlossaryProvider>
+          <GlossaryDrawerProvider>
+            <AppRoutes />
+            <GlossaryFab />
+            <GlossaryDrawer />
+            <BadgeToast />
+          </GlossaryDrawerProvider>
+        </GlossaryProvider>
+      </BadgeNotificationProvider>
     </AuthProvider>
   );
 }

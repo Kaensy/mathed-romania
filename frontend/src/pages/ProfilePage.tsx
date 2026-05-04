@@ -7,7 +7,7 @@
  *   1. Student info header (name, email, type badge, streak)
  *   2. Stats overview (2x2 grid)
  *   3. Weak categories list (up to 10)
- *   4. Future placeholder (badges, test history)
+ *   4. Badges grid (earned + locked)
  */
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
+import BadgeGrid from "@/components/badges/BadgeGrid";
 import type {
   DashboardStats,
   WeakCategoriesResponse,
@@ -178,7 +179,8 @@ export default function ProfilePage() {
           </section>
         )}
 
-        {/* Block 9: Badges grid will go here */}
+        {/* ── Section 4: Badges ─────────────────────────────────── */}
+        {isStudent && <BadgeGrid />}
       </main>
 
       {streakModalOpen && streak && (
