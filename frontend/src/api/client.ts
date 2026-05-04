@@ -1,5 +1,7 @@
 import axios from "axios";
 
+import { notifyBadges } from "@/lib/badgeNotifier";
+
 const api = axios.create({
   baseURL: "/api/v1",
   headers: {
@@ -27,7 +29,13 @@ const processQueue = (error: unknown = null) => {
 };
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const newlyEarned = response.data?.newly_earned_badges;
+    if (Array.isArray(newlyEarned) && newlyEarned.length > 0) {
+      notifyBadges(newlyEarned);
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 

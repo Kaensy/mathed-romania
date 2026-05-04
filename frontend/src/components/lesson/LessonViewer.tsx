@@ -41,12 +41,6 @@ export default function LessonViewer() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [lessonId]);
 
-    // Mark lesson as opened when it loads
-    useEffect(() => {
-        if (!lessonId || !lesson) return;
-        api.post(`/progress/lessons/${lessonId}/open/`).catch(() => { });
-    }, [lessonId, lesson]);
-
   // Call open endpoint when lesson loads successfully
   useEffect(() => {
      if (!lessonId || !lesson) return;
