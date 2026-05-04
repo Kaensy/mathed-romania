@@ -2,7 +2,7 @@
 // ExerciseHubPage.tsx  —  route: /topic/:topicId/exercises
 // ═══════════════════════════════════════════════════════════════════════════
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Lock, Star } from "lucide-react";
 import api from "@/api/client";
 import { CATEGORY_LABELS } from "@/constants/categoryLabels";

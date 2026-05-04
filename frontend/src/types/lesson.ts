@@ -64,7 +64,7 @@ export interface WorkedExampleMulti {
 
 export interface Property {
   name: string;
-  latex?: string;
+  symbolic?: string;
   example?: string;
 }
 

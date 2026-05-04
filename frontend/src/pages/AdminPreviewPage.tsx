@@ -12,7 +12,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { RotateCcw, ArrowLeft, FlaskConical } from "lucide-react";
 import api from "@/api/client";
 import ExerciseCard from "@/components/exercise/ExerciseCard";
-import type { ExerciseInstance, Difficulty } from "@/types/progress";
+import type { ExerciseInstance } from "@/types/progress";
 
   interface PreviewResponse {
     instance: ExerciseInstance;

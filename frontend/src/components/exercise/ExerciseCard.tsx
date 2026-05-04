@@ -220,11 +220,11 @@ export default function ExerciseCard({
               <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
                 <input
                   type="text"
-                  value={(answer as Record<string, string>)[exercise.fields[0].key] ?? ""}
+                  value={(answer as Record<string, string>)[exercise.fields[0]?.key ?? ""] ?? ""}
                   onChange={(e) =>
                     setAnswer((prev) => ({
                       ...(prev as Record<string, string>),
-                      [exercise.fields![0].key]: e.target.value,
+                      [exercise.fields![0]?.key ?? ""]: e.target.value,
                     }))
                   }
                   onKeyDown={handleKeyDown}
@@ -238,11 +238,11 @@ export default function ExerciseCard({
                 <span className="text-2xl text-gray-400 font-bold">&lt;</span>
                 <input
                   type="text"
-                  value={(answer as Record<string, string>)[exercise.fields[1].key] ?? ""}
+                  value={(answer as Record<string, string>)[exercise.fields[1]?.key ?? ""] ?? ""}
                   onChange={(e) =>
                     setAnswer((prev) => ({
                       ...(prev as Record<string, string>),
-                      [exercise.fields![1].key]: e.target.value,
+                      [exercise.fields![1]?.key ?? ""]: e.target.value,
                     }))
                   }
                   onKeyDown={handleKeyDown}
@@ -577,10 +577,10 @@ function DragNumberInput({
     if (fromPool) {
       const poolIdx = newPool.indexOf(item);
       if (poolIdx !== -1) newPool.splice(poolIdx, 1);
-      if (displaced !== null) newPool.push(displaced);
+      if (displaced != null) newPool.push(displaced);
     } else if (fromSlotIdx !== undefined) {
       // Swap: put displaced into the source slot
-      newSlots[fromSlotIdx] = displaced;
+      newSlots[fromSlotIdx] = displaced ?? null;
     }
 
     newSlots[slotIdx] = item;
@@ -589,7 +589,7 @@ function DragNumberInput({
 
   const returnToPool = (slotIdx: number) => {
     const item = slots[slotIdx];
-    if (item === null) return;
+    if (item == null) return;
     const newSlots = [...slots];
     newSlots[slotIdx] = null;
     commit(newSlots, [...pool, item]);

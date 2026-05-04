@@ -54,7 +54,7 @@ export default function PracticePage() {
   const [questionResults, setQuestionResults] = useState<{
     exercise: ExerciseInstance;
     is_correct: boolean;
-    answer: string | string[];
+    answer: string | string[] | Record<string, string>;
   }[]>([]);
 
   const [tierCleared, setTierCleared] = useState<TierCleared | null>(null);
@@ -159,7 +159,6 @@ export default function PracticePage() {
         tierCleared={tierCleared}
         onRestart={handleRestart}
         topicId={topicId!}
-        category={category}
         origin={origin}
       />
     );
@@ -226,7 +225,6 @@ interface CompletionScreenProps {
   tierCleared: TierCleared | null;
   onRestart: () => void;
   topicId: string;
-  category: string | null;
   origin?: string;
 }
 
@@ -237,7 +235,6 @@ function CompletionScreen({
   tierCleared,
   onRestart,
   topicId,
-  category,
   origin,
 }: CompletionScreenProps) {
   return (

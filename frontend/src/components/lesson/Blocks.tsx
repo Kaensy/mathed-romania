@@ -326,7 +326,7 @@ export function PropertiesListComponent({ block }: { block: PropertiesList }) {
               <AutoLinkText text={prop.name} />
             </div>
             <div className="px-4 py-3 text-center overflow-x-auto">
-              <BlockMath latex={prop.symbolic} />
+              <BlockMath latex={prop.symbolic ?? ""} />
             </div>
             <div className="px-4 py-3 text-gray-600">
               <AutoLinkText text={prop.example ?? ""} />

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, CheckCircle, PenLine, Star } from "lucide-react";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 import api from "@/api/client";
-import { CATEGORY_LABELS } from "@/constants/categoryLabels";
 import type { TopicExerciseSummary, ExercisesOverviewResponse } from "@/types/progress";
 
 export default function ExercisesOverviewPage() {
@@ -82,7 +81,7 @@ export default function ExercisesOverviewPage() {
               </h2>
 
               <div className="space-y-3">
-                {unitTopics.map((topic, indexInUnit) => {
+                {unitTopics.map((topic) => {
                   // Sequential number across entire list
                   const globalIndex = topics.indexOf(topic) + 1;
                   const progressPct =
