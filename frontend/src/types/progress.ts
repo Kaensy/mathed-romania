@@ -1,3 +1,5 @@
+import type { Badge } from "@/types/badges";
+
 // ─── Exercise instance ────────────────────────────────────────────────────────
 
 export type ExerciseType =
@@ -94,6 +96,8 @@ export interface AttemptResult {
     tier_cleared: TierCleared | null;
     hint_active_for_category?: string | null;
     error: string | null;
+    newly_earned_badges?: Badge[];
+    xp_gained?: number;
   }
 
 // ─── Category tier state ──────────────────────────────────────────────────────

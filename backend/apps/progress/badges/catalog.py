@@ -113,6 +113,43 @@ CATALOG: dict[str, BadgeDef] = {
         icon_name="book",
         secret=True,
     ),
+    # ── Pet level milestones (Block 10 Phase 6) ──────────────────────────
+    "pet_level_10": BadgeDef(
+        key="pet_level_10",
+        family="mastery",
+        name="Companion crescut",
+        description="Animalul tău de companie a ajuns la nivelul 10.",
+        icon_name="paw",
+    ),
+    "pet_level_25": BadgeDef(
+        key="pet_level_25",
+        family="mastery",
+        name="Companion devotat",
+        description="Animalul tău de companie a ajuns la nivelul 25.",
+        icon_name="wolf_howl",
+    ),
+    "pet_level_50": BadgeDef(
+        key="pet_level_50",
+        family="mastery",
+        name="Companion legendar",
+        description="Animalul tău de companie a ajuns la nivelul 50.",
+        icon_name="wolf_head",
+    ),
+    # ── Lifetime XP milestones (Block 10 Phase 6) ────────────────────────
+    "xp_milestone_1k": BadgeDef(
+        key="xp_milestone_1k",
+        family="progress",
+        name="Mii de pași",
+        description="Ai adunat 1.000 XP în total.",
+        icon_name="sparkles",
+    ),
+    "xp_milestone_10k": BadgeDef(
+        key="xp_milestone_10k",
+        family="progress",
+        name="Zeci de mii",
+        description="Ai adunat 10.000 XP în total.",
+        icon_name="crystal_growth",
+    ),
 }
 
 

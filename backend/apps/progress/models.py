@@ -8,6 +8,8 @@ import uuid
 from django.conf import settings
 from django.db import models
 
+from .xp.models import XPLedger  # noqa: F401  -- registers XPLedger with the progress app
+
 
 class LessonProgress(models.Model):
     """Tracks per-student, per-lesson completion (content reading)."""

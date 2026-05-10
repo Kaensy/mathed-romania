@@ -92,6 +92,7 @@ class StudentProfile(models.Model):
         default=ConsentStatus.PENDING,
     )
     consent_date = models.DateTimeField(null=True, blank=True)
+    total_xp = models.PositiveIntegerField(default=0, db_index=True)
 
     class Meta:
         db_table = "student_profiles"

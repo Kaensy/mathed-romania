@@ -1,6 +1,7 @@
 // ─── Test session ─────────────────────────────────────────────────────────────
 
 import type { ExerciseInstance } from "@/types/progress";
+import type { Badge } from "@/types/badges";
 
 export interface TestStartResponse {
   attempt_id: number;
@@ -27,6 +28,8 @@ export interface TestFinishResponse {
   passed: boolean;
   pass_threshold: number;
   answers: Record<string, AnswerRecord>;
+  newly_earned_badges?: Badge[];
+  xp_gained?: number;
 }
 
 export interface TestResultResponse {

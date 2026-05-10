@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { notifyBadges } from "@/lib/badgeNotifier";
+import { notifyXpGained } from "@/lib/xpNotifier";
 
 const api = axios.create({
   baseURL: "/api/v1",
@@ -33,6 +34,10 @@ api.interceptors.response.use(
     const newlyEarned = response.data?.newly_earned_badges;
     if (Array.isArray(newlyEarned) && newlyEarned.length > 0) {
       notifyBadges(newlyEarned);
+    }
+    const xpGained = response.data?.xp_gained;
+    if (typeof xpGained === "number" && xpGained > 0) {
+      notifyXpGained(xpGained);
     }
     return response;
   },

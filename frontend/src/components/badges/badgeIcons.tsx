@@ -6,13 +6,18 @@ import {
   GiCompass,
   GiCrown,
   GiCrossedSwords,
+  GiCrystalGrowth,
   GiCutDiamond,
   GiFlame,
   GiFootprint,
   GiMedal,
+  GiPawPrint,
   GiScrollUnfurled,
+  GiSparkles,
   GiStarsStack,
   GiTrophy,
+  GiWolfHead,
+  GiWolfHowl,
 } from "react-icons/gi";
 import type { IconBaseProps } from "react-icons";
 
@@ -34,6 +39,11 @@ const ICON_MAP: Record<string, IconComponent> = {
   comet: GiCometSpark,
   compass: GiCompass,
   book: GiBookCover,
+  paw: GiPawPrint,
+  wolf_howl: GiWolfHowl,
+  wolf_head: GiWolfHead,
+  sparkles: GiSparkles,
+  crystal_growth: GiCrystalGrowth,
 };
 
 export function getBadgeIcon(slug: string | null | undefined): IconComponent {

@@ -1,6 +1,7 @@
 // ─── Daily test types ─────────────────────────────────────────────────────────
 
 import type { ExerciseInstance } from "@/types/progress";
+import type { Badge } from "@/types/badges";
 
 export interface DailyExercise extends ExerciseInstance {
   index: number;
@@ -60,4 +61,6 @@ export interface DailySubmitResponse {
   completed_count: number;
   total_count: number;
   pending_exercises: DailyExercise[];
+  newly_earned_badges?: Badge[];
+  xp_gained?: number;
 }

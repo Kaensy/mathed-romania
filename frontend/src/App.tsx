@@ -3,9 +3,12 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { GlossaryDrawerProvider } from "@/contexts/GlossaryDrawerContext";
 import { BadgeNotificationProvider } from "@/contexts/BadgeNotificationContext";
+import { LevelUpProvider } from "@/contexts/LevelUpContext";
+import { XPNotificationProvider } from "@/contexts/XPNotificationContext";
 import GlossaryDrawer from "@/components/GlossaryDrawer";
 import GlossaryFab from "@/components/GlossaryFab";
 import BadgeToast from "@/components/badges/BadgeToast";
+import XPToast from "@/components/pets/XPToast";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -91,14 +94,19 @@ export default function App() {
   return (
     <AuthProvider>
       <BadgeNotificationProvider>
-        <GlossaryProvider>
-          <GlossaryDrawerProvider>
-            <AppRoutes />
-            <GlossaryFab />
-            <GlossaryDrawer />
-            <BadgeToast />
-          </GlossaryDrawerProvider>
-        </GlossaryProvider>
+        <XPNotificationProvider>
+          <LevelUpProvider>
+            <GlossaryProvider>
+              <GlossaryDrawerProvider>
+                <AppRoutes />
+                <GlossaryFab />
+                <GlossaryDrawer />
+                <BadgeToast />
+                <XPToast />
+              </GlossaryDrawerProvider>
+            </GlossaryProvider>
+          </LevelUpProvider>
+        </XPNotificationProvider>
       </BadgeNotificationProvider>
     </AuthProvider>
   );

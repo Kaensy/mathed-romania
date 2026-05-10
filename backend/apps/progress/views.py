@@ -20,6 +20,7 @@ from django.core.signing import SignatureExpired
 from django.db.models import Case, Count, F, IntegerField, When
 from django.utils import timezone
 from rest_framework import permissions, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -42,9 +43,77 @@ from apps.progress.serializers import (
     StreakSerializer,
 )
 from apps.progress.badges.service import evaluate_badges_for_event, serialize_badges
-from apps.progress.streak_service import _today_local, record_activity
+from apps.progress.streak_service import (
+    _today_local,
+    evaluate_streak_badges_for,
+    record_activity,
+)
+from apps.progress.xp import award_xp, student_grade
 
 logger = logging.getLogger(__name__)
+
+
+def _topic_mastery_after_attempt(attempt) -> str | None:
+    """Return current mastery tier for a passed topic-test attempt:
+    one of "passed", "mastered", "perfect", or None when not topic-scoped
+    or the attempt didn't pass.
+
+    Mirrors the tier logic in `apps.content.views._build_topic_mastery_map`,
+    narrowed to a single topic. Idempotency on each `topic_*` award means
+    we can safely fire all qualifying tiers — earlier grants no-op.
+    """
+    test = attempt.test
+    if test.scope != "topic" or test.topic_id is None or not attempt.passed:
+        return None
+
+    tier = "passed"
+    categories = set(
+        Exercise.objects
+        .filter(topic_id=test.topic_id, is_active=True)
+        .values_list("category", flat=True)
+    )
+    if not categories:
+        return tier
+
+    cleared = list(
+        CategoryProgress.objects
+        .filter(student=attempt.student_id, topic_id=test.topic_id)
+        .values("category", "medium_cleared", "hard_cleared")
+    )
+    medium = {row["category"] for row in cleared if row["medium_cleared"]}
+    if not categories.issubset(medium):
+        return tier
+    tier = "mastered"
+
+    if attempt.score is not None and attempt.score >= 100:
+        hard = {row["category"] for row in cleared if row["hard_cleared"]}
+        if categories.issubset(hard):
+            tier = "perfect"
+    return tier
+
+
+def _award_test_passed_xp(user, attempt, grade) -> int:
+    """Awards topic_passed/mastered/perfect (cumulatively, per current
+    mastery state) for a topic test, or unit_passed for a unit test.
+    Returns total XP granted by this call (0s from idempotency dedupe)."""
+    test = attempt.test
+    total = 0
+    if test.scope == "unit" and test.unit_id is not None:
+        return award_xp(
+            user, "unit_passed", {"unit_id": test.unit_id}, grade,
+        )
+
+    tier = _topic_mastery_after_attempt(attempt)
+    if tier is None:
+        return 0
+
+    ctx = {"topic_id": test.topic_id}
+    total += award_xp(user, "topic_passed", ctx, grade)
+    if tier in ("mastered", "perfect"):
+        total += award_xp(user, "topic_mastered", ctx, grade)
+    if tier == "perfect":
+        total += award_xp(user, "topic_perfect", ctx, grade)
+    return total
 
 
 # ─── Lesson open ──────────────────────────────────────────────────────────────
@@ -70,12 +139,26 @@ class LessonOpenView(APIView):
             defaults={"status": LessonProgress.Status.IN_PROGRESS},
         )
 
+        xp_gained = 0
         streak_badges: list[str] = []
         if created:
             try:
-                streak_badges = record_activity(request.user, "lesson")
+                xp_gained += record_activity(request.user, "lesson")
+                streak_badges = evaluate_streak_badges_for(request.user)
             except Exception:
                 logger.warning("Streak update failed", exc_info=True)
+
+            grade = student_grade(request.user)
+            if grade is not None:
+                try:
+                    xp_gained += award_xp(
+                        request.user,
+                        "lesson_first_open",
+                        {"lesson_id": lesson.id},
+                        grade,
+                    )
+                except Exception:
+                    logger.warning("XP award failed", exc_info=True)
 
         if not created and progress.status == LessonProgress.Status.NOT_STARTED:
             progress.status = LessonProgress.Status.IN_PROGRESS
@@ -93,6 +176,7 @@ class LessonOpenView(APIView):
             "lesson_id": lesson_id,
             "status": progress.status,
             "newly_earned_badges": serialize_badges(streak_badges + own_badges),
+            "xp_gained": xp_gained,
         })
 
 
@@ -382,11 +466,33 @@ class ExerciseAttemptView(APIView):
             session_id=session_id,
         )
 
+        xp_gained = 0
         streak_badges: list[str] = []
         try:
-            streak_badges = record_activity(request.user, "exercise")
+            xp_gained += record_activity(request.user, "exercise")
+            streak_badges = evaluate_streak_badges_for(request.user)
         except Exception:
             logger.warning("Streak update failed", exc_info=True)
+
+        grade = student_grade(request.user)
+        if grade is not None:
+            today_iso = _today_local().isoformat()
+            try:
+                xp_gained += award_xp(
+                    request.user,
+                    "daily_first_exercise_try",
+                    {"date": today_iso, "grade_id": grade.id},
+                    grade,
+                )
+                if is_correct:
+                    xp_gained += award_xp(
+                        request.user,
+                        "daily_first_exercise_complete",
+                        {"date": today_iso, "grade_id": grade.id},
+                        grade,
+                    )
+            except Exception:
+                logger.warning("XP award failed", exc_info=True)
 
         # ── Category stats update (atomic, F-expressions) ────────────
         if exercise.category:
@@ -442,6 +548,19 @@ class ExerciseAttemptView(APIView):
         if session_id:
             tier_cleared = self._check_tier_cleared(request.user, session_id, exercise)
 
+        if tier_cleared and grade is not None and exercise.category:
+            tiers_to_award = [tier_cleared["tier"], *tier_cleared.get("also_cleared", [])]
+            for tier in tiers_to_award:
+                try:
+                    xp_gained += award_xp(
+                        request.user,
+                        f"category_{tier}_tier_cleared",
+                        {"category_id": exercise.category},
+                        grade,
+                    )
+                except Exception:
+                    logger.warning("XP award failed", exc_info=True)
+
         correct_display = _correct_answer_display(exercise.exercise_type, grading_data) if not is_correct else None
 
         own_badges: list[str] = []
@@ -460,6 +579,7 @@ class ExerciseAttemptView(APIView):
             "hint_active_for_category": hint_active_for_category,
             "error": error if not is_correct else None,
             "newly_earned_badges": serialize_badges(streak_badges + own_badges),
+            "xp_gained": xp_gained,
         })
 
     def _check_tier_cleared(self, user, session_id, exercise):
@@ -1199,15 +1319,29 @@ class DailyTestSubmitView(APIView):
         session.completed_indices = sorted(completed_set)
 
         total = len(instances)
+        xp_gained = 0
         streak_badges: list[str] = []
         if total > 0 and len(completed_set) == total:
             session.is_completed = True
             session.completed_at = timezone.now()
             session.save()
             try:
-                streak_badges = record_activity(request.user, "daily_test")
+                xp_gained += record_activity(request.user, "daily_test")
+                streak_badges = evaluate_streak_badges_for(request.user)
             except Exception:
                 logger.warning("Streak update failed", exc_info=True)
+
+            grade = student_grade(request.user)
+            if grade is not None:
+                try:
+                    xp_gained += award_xp(
+                        request.user,
+                        "daily_test_complete",
+                        {"date": today.isoformat(), "grade_id": grade.id},
+                        grade,
+                    )
+                except Exception:
+                    logger.warning("XP award failed", exc_info=True)
         else:
             session.save(update_fields=["exercise_instances", "completed_indices", "answers"])
 
@@ -1218,6 +1352,7 @@ class DailyTestSubmitView(APIView):
             "total_count": total,
             "pending_exercises": regenerated_pending,
             "newly_earned_badges": serialize_badges(streak_badges),
+            "xp_gained": xp_gained,
         })
 
 
@@ -1376,12 +1511,22 @@ class TestFinishView(APIView):
         attempt.finished_at = timezone.now()
         attempt.save()
 
+        xp_gained = 0
         streak_badges: list[str] = []
         try:
             act_type = "topic_test" if test.scope == "topic" else "unit_test"
-            streak_badges = record_activity(request.user, act_type)
+            xp_gained += record_activity(request.user, act_type)
+            streak_badges = evaluate_streak_badges_for(request.user)
         except Exception:
             logger.warning("Streak update failed", exc_info=True)
+
+        if passed:
+            grade = student_grade(request.user)
+            if grade is not None:
+                try:
+                    xp_gained += _award_test_passed_xp(request.user, attempt, grade)
+                except Exception:
+                    logger.warning("XP award failed", exc_info=True)
 
         own_badges: list[str] = []
         try:
@@ -1398,6 +1543,7 @@ class TestFinishView(APIView):
             "pass_threshold": test.pass_threshold,
             "answers": graded_answers,
             "newly_earned_badges": serialize_badges(streak_badges + own_badges),
+            "xp_gained": xp_gained,
         })
 
 
@@ -1610,3 +1756,70 @@ class AchievementListView(APIView):
             })
 
         return Response({"achievements": achievements})
+
+
+# ─── XP ledger ────────────────────────────────────────────────────────────────
+
+class _XPLedgerPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = None
+    max_page_size = 50
+
+
+class XPLedgerView(APIView):
+    """
+    GET /api/v1/progress/xp/ledger/?grade=<N>&page=<N>
+
+    Paginated list of the student's XP grants, newest first. Optional
+    `grade` query param filters to a specific grade-numbered ledger
+    (i.e. one pet's lifetime). Each row carries a Romanian
+    `source_display` resolved from the XP_AWARDS catalog.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.progress.xp import XPLedger
+        from apps.progress.xp.awards import XP_AWARDS
+
+        user = request.user
+        if not getattr(user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au istoric XP."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        qs = (
+            XPLedger.objects
+            .filter(student=user)
+            .select_related("grade")
+            .order_by("-granted_at", "-id")
+        )
+
+        grade_param = request.query_params.get("grade")
+        if grade_param is not None:
+            try:
+                grade_number = int(grade_param)
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "Parametrul grade trebuie să fie un număr."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(grade__number=grade_number)
+
+        paginator = _XPLedgerPagination()
+        page = paginator.paginate_queryset(qs, request, view=self)
+
+        rows = [
+            {
+                "source": row.source,
+                "source_display": (
+                    XP_AWARDS[row.source]["display_name"]
+                    if row.source in XP_AWARDS else row.source
+                ),
+                "amount": row.amount,
+                "granted_at": row.granted_at.isoformat(),
+                "grade_number": row.grade.number,
+            }
+            for row in page
+        ]
+        return paginator.get_paginated_response(rows)

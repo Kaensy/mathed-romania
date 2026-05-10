@@ -9,6 +9,7 @@ import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
 import RecentBadgesWidget from "@/components/badges/RecentBadgesWidget";
+import PetPanel from "@/components/pets/PetPanel";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -121,6 +122,9 @@ export default function DashboardPage() {
             />
           </div>
         )}
+
+        {/* Pet panel — XP / level overview */}
+        {user.user_type === "student" && <PetPanel />}
 
         {/* Daily test widget */}
         {user.user_type === "student" && <DailyTestCard />}

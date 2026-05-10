@@ -22,6 +22,7 @@ from .views import (
     TopicCategoriesView,
     TopicPracticeView,
     WeakCategoriesView,
+    XPLedgerView,
 )
 
 urlpatterns = [
@@ -63,4 +64,7 @@ urlpatterns = [
 
     # Achievements
     path("achievements/", AchievementListView.as_view(), name="achievement_list"),
+
+    # XP ledger
+    path("xp/ledger/", XPLedgerView.as_view(), name="xp_ledger"),
 ]

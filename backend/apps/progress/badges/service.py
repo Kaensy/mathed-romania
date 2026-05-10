@@ -35,6 +35,15 @@ EVENT_EVALUATORS: dict[str, list[tuple[str, callable]]] = {
     "glossary_opened": [
         ("glossary_first_open", evaluators.glossary_first_open),
     ],
+    "pet_level_up": [
+        ("pet_level_10", evaluators.pet_level_10),
+        ("pet_level_25", evaluators.pet_level_25),
+        ("pet_level_50", evaluators.pet_level_50),
+    ],
+    "xp_milestone": [
+        ("xp_milestone_1k", evaluators.xp_milestone_1k),
+        ("xp_milestone_10k", evaluators.xp_milestone_10k),
+    ],
 }
 
 

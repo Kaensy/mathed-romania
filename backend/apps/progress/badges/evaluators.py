@@ -211,3 +211,31 @@ def streak_30(user, context) -> bool:
 
 def glossary_first_open(user, context) -> bool:
     return True
+
+
+# ---------------------------------------------------------------------------
+# Event: pet_level_up           context: {"new_level": int}
+# ---------------------------------------------------------------------------
+
+def pet_level_10(user, context) -> bool:
+    return context.get("new_level", 0) >= 10
+
+
+def pet_level_25(user, context) -> bool:
+    return context.get("new_level", 0) >= 25
+
+
+def pet_level_50(user, context) -> bool:
+    return context.get("new_level", 0) >= 50
+
+
+# ---------------------------------------------------------------------------
+# Event: xp_milestone           context: {"new_total": int}
+# ---------------------------------------------------------------------------
+
+def xp_milestone_1k(user, context) -> bool:
+    return context.get("new_total", 0) >= 1000
+
+
+def xp_milestone_10k(user, context) -> bool:
+    return context.get("new_total", 0) >= 10000
