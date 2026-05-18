@@ -12,6 +12,8 @@ from .views import (
     HintUsedView,
     LessonCompleteView,
     LessonOpenView,
+    MilestoneClaimView,
+    QuestClaimView,
     QuestListView,
     QuestSyncView,
     StreakView,
@@ -67,6 +69,16 @@ urlpatterns = [
     # Quests
     path("quests/", QuestListView.as_view(), name="quest_list"),
     path("quests/sync/", QuestSyncView.as_view(), name="quest_sync"),
+    path(
+        "quests/milestone/<int:threshold>/claim/",
+        MilestoneClaimView.as_view(),
+        name="quest_milestone_claim",
+    ),
+    path(
+        "quests/<int:assignment_id>/claim/",
+        QuestClaimView.as_view(),
+        name="quest_claim",
+    ),
 
     # Achievements
     path("achievements/", AchievementListView.as_view(), name="achievement_list"),

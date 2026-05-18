@@ -180,8 +180,8 @@ QUEST_CATALOG: dict[str, QuestDef] = {
         cadence="weekly",
         goal_type="daily_quest_claimed",
         title="Vânător de misiuni",
-        description="Revendică 20 de misiuni zilnice în această săptămână.",
-        target_count=20,
+        description="Revendică 10 misiuni zilnice în această săptămână.",
+        target_count=10,
         xp_reward=WEEKLY_QUESTS_CLAIMED_XP,
     ),
 }

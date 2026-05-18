@@ -6,7 +6,11 @@ adding or editing a source never requires a database migration (XPLedger
 stores `source` as a free-form CharField).
 
 Each entry maps a source slug to:
-- `amount`: integer XP granted on a successful (non-duplicate) grant.
+- `amount`: XP granted on a successful (non-duplicate) grant. Either a
+  fixed int, or a callable taking the call-site context dict and
+  returning the int — use the callable form when the reward varies per
+  grant (e.g. per-quest or per-milestone payouts that carry their
+  amount in `ctx["xp"]`).
 - `key_builder`: callable taking the call-site context dict and
   returning an `idempotency_key` string. The key_builder decides the
   scope: include a date+grade for daily resets, a topic_id for
@@ -20,7 +24,7 @@ from typing import Callable, TypedDict
 
 
 class XPAwardDef(TypedDict):
-    amount: int
+    amount: int | Callable[[dict], int]
     key_builder: Callable[[dict], str]
     display_name: str
 
@@ -89,5 +93,16 @@ XP_AWARDS: dict[str, XPAwardDef] = {
         "amount": 5,
         "key_builder": lambda ctx: f"lesson_first_open:lesson_{ctx['lesson_id']}",
         "display_name": "Lecție nouă deschisă",
+    },
+    # ── Quests (Block 11; amount varies per quest / per milestone) ──────────────
+    "quest_completed": {
+        "amount": lambda ctx: ctx["xp"],
+        "key_builder": lambda ctx: f"quest_completed:assignment_{ctx['assignment_id']}",
+        "display_name": "Misiune îndeplinită",
+    },
+    "daily_milestone": {
+        "amount": lambda ctx: ctx["xp"],
+        "key_builder": lambda ctx: f"daily_milestone:{ctx['date']}:threshold_{ctx['threshold']}",
+        "display_name": "Bonus zilnic",
     },
 }

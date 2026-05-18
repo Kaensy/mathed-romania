@@ -51,9 +51,14 @@ def sync_quests(user) -> dict:
     leans on the (student, quest_slug, period_key) unique constraint, so
     a concurrent double-sync resolves to the same rows).
 
-    After the rows exist it emits the generic `login` event through the
-    same counter every other event uses — so the login quest needs no
-    special-casing here or anywhere else.
+    Past-period assignments (relative to each cadence's current key)
+    that were never claimed are bulk-marked `expired` so they fall out
+    of the active set without lingering as stale "completed".
+
+    The generic `login` event is emitted through the same counter every
+    other event uses — but only on the day's first sync (the call that
+    creates today's DailyChallengeProgress), so the weekly login quest
+    counts distinct calendar days rather than sync calls.
     """
     profile = _resolve_profile(user)
     if profile is None:
@@ -62,6 +67,20 @@ def sync_quests(user) -> dict:
     today = today_local()
     daily_pk = daily_period_key(today)
     weekly_pk = weekly_period_key(today)
+
+    # Expire this student's past-period, never-claimed assignments. A
+    # bulk maintenance sweep — the only place sync deliberately reaches
+    # outside the current period. Claimed rows are preserved as history.
+    QuestAssignment.objects.filter(
+        student=profile,
+        status__in=[
+            QuestAssignment.Status.ACTIVE,
+            QuestAssignment.Status.COMPLETED,
+        ],
+    ).filter(
+        (Q(cadence=QuestAssignment.Cadence.DAILY) & ~Q(period_key=daily_pk))
+        | (Q(cadence=QuestAssignment.Cadence.WEEKLY) & ~Q(period_key=weekly_pk))
+    ).update(status=QuestAssignment.Status.EXPIRED)
 
     for q in daily_quests():
         QuestAssignment.objects.get_or_create(
@@ -83,17 +102,19 @@ def sync_quests(user) -> dict:
                 "target": q.target_count,
             },
         )
-    DailyChallengeProgress.objects.get_or_create(student=profile, date=today)
+    _, bar_created = DailyChallengeProgress.objects.get_or_create(
+        student=profile, date=today,
+    )
 
-    # Generic login emission. Defensive: ensuring the rows is the
-    # primary mutation and must survive a counter failure. NOTE: this
-    # fires on every sync, so weekly_login effectively counts "synced
-    # this week" rather than distinct calendar days — an accepted
-    # Phase-2 simplification (no special-casing, per spec).
-    try:
-        record_quest_progress(user, "login")
-    except Exception:
-        logger.warning("Quest login emission failed", exc_info=True)
+    # Generic login emission, gated to the day's first sync (the call
+    # that created today's bar row). This makes the weekly login quest
+    # count distinct days, not sync calls. Defensive: ensuring the rows
+    # is the primary mutation and must survive a counter failure.
+    if bar_created:
+        try:
+            record_quest_progress(user, "login")
+        except Exception:
+            logger.warning("Quest login emission failed", exc_info=True)
 
     return build_current_period_state(user)
 
@@ -155,6 +176,190 @@ def record_quest_progress(user, event: str, context: dict | None = None) -> None
                 a.save(update_fields=["progress", "status", "completed_at"])
             else:
                 a.save(update_fields=["progress"])
+
+
+# ── Claim paths ─────────────────────────────────────────────────────────────
+
+class QuestClaimError(Exception):
+    """A claim was rejected. Carries the Romanian message and the HTTP
+    status the view should surface."""
+
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
+_MILESTONE_XP = {threshold: xp for (threshold, xp) in DAILY_MILESTONES}
+
+
+def claim_quest(user, assignment_id: int) -> dict:
+    """Claim a completed quest assignment: flip it to `claimed`, pay its
+    catalog `xp_reward` into the student's current-grade pet, and (for a
+    daily quest) accrue its `point_value` to today's points bar.
+
+    Idempotency rests on the status check: only a `completed` →
+    `claimed` transition is allowed, so a repeat call is rejected (and
+    the assignment-id-scoped XP key is a second guard). Stale-period
+    claims are refused — the assignment's period must still be current
+    for its cadence.
+
+    Returns {assignment, xp_gained, bar} where `bar` is the updated
+    daily bar for a daily claim, else None. Raises QuestClaimError on
+    any validation failure.
+    """
+    from apps.progress.xp import award_xp, student_grade  # Block 10 cycle
+
+    profile = _resolve_profile(user)
+    if profile is None:
+        raise QuestClaimError("Doar elevii pot revendica misiuni.", 403)
+
+    assignment = (
+        QuestAssignment.objects
+        .filter(pk=assignment_id, student=profile)
+        .first()
+    )
+    if assignment is None:
+        raise QuestClaimError("Misiunea nu există.", 404)
+
+    today = today_local()
+    current_pk = (
+        daily_period_key(today)
+        if assignment.cadence == QuestAssignment.Cadence.DAILY
+        else weekly_period_key(today)
+    )
+    if assignment.period_key != current_pk:
+        raise QuestClaimError(
+            "Misiunea aparține unei perioade încheiate.", 400,
+        )
+
+    _reject_unclaimable(assignment.status)
+
+    quest = QUEST_CATALOG.get(assignment.quest_slug)
+    xp_reward = quest.xp_reward if quest else 0
+    now = timezone.now()
+
+    with transaction.atomic():
+        locked = (
+            QuestAssignment.objects.select_for_update().get(pk=assignment.pk)
+        )
+        # Re-check under the row lock (TOCTOU + the idempotency guard).
+        _reject_unclaimable(locked.status)
+
+        locked.status = QuestAssignment.Status.CLAIMED
+        locked.claimed_at = now
+        locked.save(update_fields=["status", "claimed_at"])
+
+        grade = student_grade(user)
+        xp_gained = 0
+        if grade is not None and xp_reward:
+            xp_gained = award_xp(
+                user,
+                "quest_completed",
+                {"assignment_id": locked.pk, "xp": xp_reward},
+                grade,
+            )
+
+        bar_data = None
+        if locked.cadence == QuestAssignment.Cadence.DAILY:
+            point_value = quest.point_value if quest else 0
+            DailyChallengeProgress.objects.get_or_create(
+                student=profile, date=today,
+            )
+            locked_bar = (
+                DailyChallengeProgress.objects
+                .select_for_update()
+                .get(student=profile, date=today)
+            )
+            if point_value:
+                locked_bar.points += point_value
+                locked_bar.save(update_fields=["points"])
+            bar_data = _serialize_bar(locked_bar, today)
+
+    return {
+        "assignment": _serialize_assignment(locked),
+        "xp_gained": xp_gained,
+        "bar": bar_data,
+    }
+
+
+def _reject_unclaimable(status: str) -> None:
+    if status == QuestAssignment.Status.CLAIMED:
+        raise QuestClaimError("Misiunea a fost deja revendicată.", 400)
+    if status != QuestAssignment.Status.COMPLETED:
+        raise QuestClaimError("Misiunea nu este finalizată.", 400)
+
+
+def claim_milestone(user, threshold: int) -> dict:
+    """Claim a daily points-bar milestone: record the threshold and pay
+    its DAILY_MILESTONES XP into the student's current-grade pet.
+
+    Idempotency rests on `claimed_thresholds` membership. Today's bar
+    row must already exist (this never creates one) and hold enough
+    points. Returns {bar, xp_gained}; raises QuestClaimError otherwise.
+    """
+    from apps.progress.xp import award_xp, student_grade  # Block 10 cycle
+
+    profile = _resolve_profile(user)
+    if profile is None:
+        raise QuestClaimError("Doar elevii pot revendica recompense.", 403)
+
+    if threshold not in _MILESTONE_XP:
+        raise QuestClaimError("Prag invalid.", 400)
+
+    today = today_local()
+    bar = (
+        DailyChallengeProgress.objects
+        .filter(student=profile, date=today)
+        .first()
+    )
+    if bar is None:
+        raise QuestClaimError("Nu există progres pentru ziua de azi.", 400)
+    _reject_milestone(bar.points, bar.claimed_thresholds, threshold)
+
+    rung_xp = _MILESTONE_XP[threshold]
+
+    with transaction.atomic():
+        locked_bar = (
+            DailyChallengeProgress.objects.select_for_update().get(pk=bar.pk)
+        )
+        # Re-check under the row lock (TOCTOU + the idempotency guard).
+        _reject_milestone(
+            locked_bar.points, locked_bar.claimed_thresholds, threshold,
+        )
+
+        claimed = list(locked_bar.claimed_thresholds)
+        claimed.append(threshold)
+        locked_bar.claimed_thresholds = claimed
+        locked_bar.save(update_fields=["claimed_thresholds"])
+
+        grade = student_grade(user)
+        xp_gained = 0
+        if grade is not None and rung_xp:
+            xp_gained = award_xp(
+                user,
+                "daily_milestone",
+                {
+                    "date": today.isoformat(),
+                    "threshold": threshold,
+                    "xp": rung_xp,
+                },
+                grade,
+            )
+
+    return {
+        "bar": _serialize_bar(locked_bar, today),
+        "xp_gained": xp_gained,
+    }
+
+
+def _reject_milestone(points: int, claimed: list, threshold: int) -> None:
+    if threshold in claimed:
+        raise QuestClaimError("Pragul a fost deja revendicat.", 400)
+    if points < threshold:
+        raise QuestClaimError(
+            "Nu ai suficiente puncte pentru acest prag.", 400,
+        )
 
 
 # ── Read-side state ─────────────────────────────────────────────────────────

@@ -1896,3 +1896,64 @@ class QuestListView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         return Response(build_current_period_state(request.user))
+
+
+class QuestClaimView(APIView):
+    """
+    POST /api/v1/progress/quests/<assignment_id>/claim/
+
+    Claims a completed quest: status → claimed, the catalog xp_reward
+    is paid into the student's current-grade pet, and a daily quest
+    also accrues its point_value to today's bar. Returns the updated
+    assignment (+ bar for a daily claim) and surfaces `xp_gained` per
+    the Block 10 XP-toast convention.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, assignment_id):
+        from apps.progress.quests.service import QuestClaimError, claim_quest
+
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au misiuni."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            data = claim_quest(request.user, assignment_id)
+        except QuestClaimError as exc:
+            return Response({"error": exc.message}, status=exc.status_code)
+
+        # A claimed daily quest feeds the weekly "claim N dailies" quest.
+        # Post-commit, defensive (Block 10 cross-system-hook convention).
+        if data["assignment"]["cadence"] == "daily":
+            _safe_record_quest_progress(request.user, "daily_quest_claimed")
+
+        return Response(data)
+
+
+class MilestoneClaimView(APIView):
+    """
+    POST /api/v1/progress/quests/milestone/<threshold>/claim/
+
+    Claims a daily points-bar milestone rung: records the threshold and
+    pays its DAILY_MILESTONES XP into the student's current-grade pet.
+    Returns the updated bar and surfaces `xp_gained`.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, threshold):
+        from apps.progress.quests.service import (
+            QuestClaimError,
+            claim_milestone,
+        )
+
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au misiuni."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            data = claim_milestone(request.user, threshold)
+        except QuestClaimError as exc:
+            return Response({"error": exc.message}, status=exc.status_code)
+        return Response(data)

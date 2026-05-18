@@ -62,6 +62,9 @@ def award_xp(user, source: str, context: dict, grade) -> int:
 
     award = XP_AWARDS[source]
     amount = award["amount"]
+    if callable(amount):
+        # Per-grant amount (quest/milestone payouts carry it in context).
+        amount = amount(context)
     key = award["key_builder"](context)
 
     try:
