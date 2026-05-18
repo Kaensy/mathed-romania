@@ -291,12 +291,20 @@ def _reject_unclaimable(status: str) -> None:
 
 
 def claim_milestone(user, threshold: int) -> dict:
-    """Claim a daily points-bar milestone: record the threshold and pay
-    its DAILY_MILESTONES XP into the student's current-grade pet.
+    """Claim a daily points-bar milestone — and sweep.
+
+    Claiming threshold T claims every still-unclaimed rung at or below
+    T (all are reachable: their threshold ≤ T ≤ points), each paid as
+    its own `daily_milestone:<date>:threshold_<n>` grant. The returned
+    `xp_gained` is the combined total so the toast shows one number.
+
+    Validation is unchanged and only concerns the *requested* rung:
+    reject if T itself is already claimed or out of reach. Lower
+    already-claimed rungs are not an error — they're just skipped.
 
     Idempotency rests on `claimed_thresholds` membership. Today's bar
-    row must already exist (this never creates one) and hold enough
-    points. Returns {bar, xp_gained}; raises QuestClaimError otherwise.
+    row must already exist (this never creates one). Returns
+    {bar, xp_gained}; raises QuestClaimError otherwise.
     """
     from apps.progress.xp import award_xp, student_grade  # Block 10 cycle
 
@@ -317,35 +325,42 @@ def claim_milestone(user, threshold: int) -> dict:
         raise QuestClaimError("Nu există progres pentru ziua de azi.", 400)
     _reject_milestone(bar.points, bar.claimed_thresholds, threshold)
 
-    rung_xp = _MILESTONE_XP[threshold]
-
     with transaction.atomic():
         locked_bar = (
             DailyChallengeProgress.objects.select_for_update().get(pk=bar.pk)
         )
-        # Re-check under the row lock (TOCTOU + the idempotency guard).
+        # Re-check the *requested* rung under the row lock (TOCTOU +
+        # idempotency). Lower already-claimed rungs are skipped below,
+        # not rejected.
         _reject_milestone(
             locked_bar.points, locked_bar.claimed_thresholds, threshold,
         )
 
         claimed = list(locked_bar.claimed_thresholds)
-        claimed.append(threshold)
-        locked_bar.claimed_thresholds = claimed
-        locked_bar.save(update_fields=["claimed_thresholds"])
-
         grade = student_grade(user)
         xp_gained = 0
-        if grade is not None and rung_xp:
-            xp_gained = award_xp(
-                user,
-                "daily_milestone",
-                {
-                    "date": today.isoformat(),
-                    "threshold": threshold,
-                    "xp": rung_xp,
-                },
-                grade,
-            )
+        # Sweep every unclaimed rung at or below T (all reachable —
+        # their threshold ≤ T ≤ points, per the validation above).
+        swept = sorted(
+            rt for rt in _MILESTONE_XP
+            if rt <= threshold and rt not in claimed
+        )
+        for rt in swept:
+            claimed.append(rt)
+            rt_xp = _MILESTONE_XP[rt]
+            if grade is not None and rt_xp:
+                xp_gained += award_xp(
+                    user,
+                    "daily_milestone",
+                    {
+                        "date": today.isoformat(),
+                        "threshold": rt,
+                        "xp": rt_xp,
+                    },
+                    grade,
+                )
+        locked_bar.claimed_thresholds = claimed
+        locked_bar.save(update_fields=["claimed_thresholds"])
 
     return {
         "bar": _serialize_bar(locked_bar, today),

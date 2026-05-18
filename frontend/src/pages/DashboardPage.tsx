@@ -10,6 +10,7 @@ import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
 import RecentBadgesWidget from "@/components/badges/RecentBadgesWidget";
 import PetPanel from "@/components/pets/PetPanel";
+import QuestSummaryCard from "@/components/quests/QuestSummaryCard";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -128,6 +129,9 @@ export default function DashboardPage() {
 
         {/* Daily test widget */}
         {user.user_type === "student" && <DailyTestCard />}
+
+        {/* Quests summary widget */}
+        {user.user_type === "student" && <QuestSummaryCard />}
 
         {/* Recomandat pentru tine — weak categories */}
         {user.user_type === "student" && weakCategories && weakCategories.length > 0 && (

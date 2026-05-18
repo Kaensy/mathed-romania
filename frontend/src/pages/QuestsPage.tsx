@@ -16,6 +16,7 @@ import { ArrowLeft, ListChecks } from "lucide-react";
 
 import MilestoneBar from "@/components/quests/MilestoneBar";
 import QuestCard from "@/components/quests/QuestCard";
+import { useBonusCelebration } from "@/contexts/BonusCelebrationContext";
 import { useQuests } from "@/hooks/useQuests";
 
 type TabId = "daily" | "weekly";
@@ -35,6 +36,7 @@ export default function QuestsPage() {
   const navigate = useNavigate();
   const { daily, weekly, bar, loading, error, claimQuest, claimMilestone, refetch } =
     useQuests();
+  const { notifyBonus } = useBonusCelebration();
 
   const [activeTab, setActiveTab] = useState<TabId>("daily");
 
@@ -63,8 +65,17 @@ export default function QuestsPage() {
   const handleClaimMilestone = async (threshold: number) => {
     setMilestoneError(null);
     setClaimingThreshold(threshold);
+    // The finale rung (max threshold — 100 in the catalog). The sweep
+    // means a single claim can newly complete it; detect by comparing
+    // claimed_thresholds before vs after. Only the finale celebrates.
+    const finale = bar
+      ? bar.milestones.reduce((m, r) => Math.max(m, r.threshold), 0)
+      : 100;
+    const had100 = bar?.claimed_thresholds.includes(finale) ?? false;
     try {
-      await claimMilestone(threshold);
+      const res = await claimMilestone(threshold);
+      const has100 = res.bar.claimed_thresholds.includes(finale);
+      if (!had100 && has100) notifyBonus();
     } catch (err) {
       setMilestoneError(extractError(err, "Nu am putut revendica recompensa."));
     } finally {

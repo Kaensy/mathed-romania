@@ -4,11 +4,13 @@ import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { GlossaryDrawerProvider } from "@/contexts/GlossaryDrawerContext";
 import { BadgeNotificationProvider } from "@/contexts/BadgeNotificationContext";
 import { LevelUpProvider } from "@/contexts/LevelUpContext";
+import { BonusCelebrationProvider } from "@/contexts/BonusCelebrationContext";
 import { XPNotificationProvider } from "@/contexts/XPNotificationContext";
 import GlossaryDrawer from "@/components/GlossaryDrawer";
 import GlossaryFab from "@/components/GlossaryFab";
 import BadgeToast from "@/components/badges/BadgeToast";
 import XPToast from "@/components/pets/XPToast";
+import BonusCelebration from "@/components/quests/BonusCelebration";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -98,15 +100,18 @@ export default function App() {
       <BadgeNotificationProvider>
         <XPNotificationProvider>
           <LevelUpProvider>
-            <GlossaryProvider>
-              <GlossaryDrawerProvider>
-                <AppRoutes />
-                <GlossaryFab />
-                <GlossaryDrawer />
-                <BadgeToast />
-                <XPToast />
-              </GlossaryDrawerProvider>
-            </GlossaryProvider>
+            <BonusCelebrationProvider>
+              <GlossaryProvider>
+                <GlossaryDrawerProvider>
+                  <AppRoutes />
+                  <GlossaryFab />
+                  <GlossaryDrawer />
+                  <BadgeToast />
+                  <XPToast />
+                  <BonusCelebration />
+                </GlossaryDrawerProvider>
+              </GlossaryProvider>
+            </BonusCelebrationProvider>
           </LevelUpProvider>
         </XPNotificationProvider>
       </BadgeNotificationProvider>
