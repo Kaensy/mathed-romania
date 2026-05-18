@@ -28,6 +28,7 @@ import AdminPreviewPage from "@/pages/AdminPreviewPage";
 import ProfilePage from "@/pages/ProfilePage";
 import TestHistoryPage from "@/pages/TestHistoryPage";
 import GlossaryPage from "@/pages/GlossaryPage";
+import QuestsPage from "@/pages/QuestsPage";
 
 /**
  * Redirects authenticated users away from auth pages (login, register).
@@ -73,6 +74,7 @@ function AppRoutes() {
       <Route path="/grade/:gradeNumber" element={ <ProtectedRoute> <GradePage /> </ProtectedRoute> } />
       <Route path="/test/:testId" element={<ProtectedRoute><TestPage /></ProtectedRoute>} />
       <Route path="/daily" element={<ProtectedRoute allowedTypes={["student"]}><DailyTestPage /></ProtectedRoute>} />
+      <Route path="/quests" element={<ProtectedRoute allowedTypes={["student"]}><QuestsPage /></ProtectedRoute>} />
       <Route path="/exercises" element={<ProtectedRoute><ExercisesOverviewPage /></ProtectedRoute>} />
       <Route path="/tests" element={<ProtectedRoute><TestsOverviewPage /></ProtectedRoute>} />
       <Route path="/admin-preview/exercise/:exerciseId" element={<ProtectedRoute><AdminPreviewPage /></ProtectedRoute>} />
