@@ -116,6 +116,22 @@ def _award_test_passed_xp(user, attempt, grade) -> int:
     return total
 
 
+def _safe_record_quest_progress(user, event: str, context: dict | None = None) -> None:
+    """Fire a quest-progress event defensively.
+
+    Lazy import + swallow, per the Block 10 cross-system-hook
+    convention: a quest-counter bug must never roll back the view's
+    primary mutation (graded attempt, finished test, …).
+    """
+    try:
+        from apps.progress.quests.service import record_quest_progress
+        record_quest_progress(user, event, context)
+    except Exception:
+        logger.warning(
+            "Quest progress update failed for event=%s", event, exc_info=True,
+        )
+
+
 # ─── Lesson open ──────────────────────────────────────────────────────────────
 
 class LessonOpenView(APIView):
@@ -465,6 +481,9 @@ class ExerciseAttemptView(APIView):
             is_correct=is_correct,
             session_id=session_id,
         )
+
+        # Any submitted practice attempt counts toward the exercise quest.
+        _safe_record_quest_progress(request.user, "exercise_completed")
 
         xp_gained = 0
         streak_badges: list[str] = []
@@ -1214,6 +1233,10 @@ class DailyTestStartView(APIView):
             completed_indices=[],
         )
 
+        # Fired only on the creation path — the early return above
+        # handles the idempotent "already started" case.
+        _safe_record_quest_progress(request.user, "daily_test_started")
+
         return Response(_serialize_session(session))
 
 
@@ -1325,6 +1348,7 @@ class DailyTestSubmitView(APIView):
             session.is_completed = True
             session.completed_at = timezone.now()
             session.save()
+            _safe_record_quest_progress(request.user, "daily_test_completed")
             try:
                 xp_gained += record_activity(request.user, "daily_test")
                 streak_badges = evaluate_streak_badges_for(request.user)
@@ -1521,6 +1545,7 @@ class TestFinishView(APIView):
             logger.warning("Streak update failed", exc_info=True)
 
         if passed:
+            _safe_record_quest_progress(request.user, "test_passed")
             grade = student_grade(request.user)
             if grade is not None:
                 try:
@@ -1823,3 +1848,51 @@ class XPLedgerView(APIView):
             for row in page
         ]
         return paginator.get_paginated_response(rows)
+
+
+# ─── Quests ───────────────────────────────────────────────────────────────────
+
+class QuestSyncView(APIView):
+    """
+    POST /api/v1/progress/quests/sync/
+
+    Idempotently materialises the student's current-period quest state
+    (one assignment per daily catalog entry at today's daily period
+    key, one per weekly entry at this week's weekly key, plus today's
+    points-bar row), emits the generic `login` event, and returns the
+    full current-period state. Re-calling is a no-op beyond the login
+    tick. No claim / payout here — that is Phase 3.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from apps.progress.quests.service import sync_quests
+
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au misiuni."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(sync_quests(request.user))
+
+
+class QuestListView(APIView):
+    """
+    GET /api/v1/progress/quests/
+
+    Read-only current-period quest state: daily and weekly assignments
+    enriched with their catalog title/description, plus the daily
+    points bar. Bulk queries only; never creates rows (POST
+    /quests/sync/ is the only writer).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.progress.quests.service import build_current_period_state
+
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au misiuni."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(build_current_period_state(request.user))

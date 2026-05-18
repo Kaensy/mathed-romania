@@ -12,6 +12,8 @@ from .views import (
     HintUsedView,
     LessonCompleteView,
     LessonOpenView,
+    QuestListView,
+    QuestSyncView,
     StreakView,
     TestsOverviewView,
     TestHistoryView,
@@ -61,6 +63,10 @@ urlpatterns = [
     path("daily/", DailyTestView.as_view(), name="daily_test"),
     path("daily/start/", DailyTestStartView.as_view(), name="daily_test_start"),
     path("daily/submit/", DailyTestSubmitView.as_view(), name="daily_test_submit"),
+
+    # Quests
+    path("quests/", QuestListView.as_view(), name="quest_list"),
+    path("quests/sync/", QuestSyncView.as_view(), name="quest_sync"),
 
     # Achievements
     path("achievements/", AchievementListView.as_view(), name="achievement_list"),

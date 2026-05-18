@@ -73,6 +73,14 @@ class QuestAssignment(models.Model):
         db_table = "quest_assignments"
         unique_together = [("student", "quest_slug", "period_key")]
         ordering = ["-created_at"]
+        indexes = [
+            # The dashboard "this student's quests for the current
+            # period" query filters on exactly these three columns.
+            models.Index(
+                fields=["student", "cadence", "period_key"],
+                name="quest_student_period_idx",
+            ),
+        ]
 
     def __str__(self):
         return (
