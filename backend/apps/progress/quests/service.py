@@ -419,6 +419,7 @@ def build_current_period_state(user) -> dict:
 def _serialize_assignment(a: QuestAssignment) -> dict:
     q = QUEST_CATALOG.get(a.quest_slug)
     return {
+        "id": a.pk,
         "slug": a.quest_slug,
         "cadence": a.cadence,
         "goal_type": q.goal_type if q else None,
