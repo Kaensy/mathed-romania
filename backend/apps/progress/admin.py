@@ -4,9 +4,11 @@ from .models import (
     Achievement,
     CategoryProgress,
     ClassroomPace,
+    DailyChallengeProgress,
     DailyTestSession,
     ExerciseAttempt,
     LessonProgress,
+    QuestAssignment,
     Streak,
     StreakActivity,
     TestAttempt,
@@ -64,3 +66,20 @@ class DailyTestSessionAdmin(admin.ModelAdmin):
 class AchievementAdmin(admin.ModelAdmin):
     list_display = ("student", "badge_key", "earned_at")
     list_filter = ("badge_key",)
+
+
+@admin.register(QuestAssignment)
+class QuestAssignmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "student", "quest_slug", "cadence", "period_key",
+        "progress", "target", "status",
+    )
+    list_filter = ("cadence", "status", "quest_slug")
+    readonly_fields = ("created_at", "completed_at", "claimed_at")
+
+
+@admin.register(DailyChallengeProgress)
+class DailyChallengeProgressAdmin(admin.ModelAdmin):
+    list_display = ("student", "date", "points", "claimed_thresholds")
+    list_filter = ("date",)
+    readonly_fields = ("created_at", "updated_at")
