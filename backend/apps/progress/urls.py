@@ -2,6 +2,8 @@ from django.urls import path
 
 from .views import (
     AchievementListView,
+    CosmeticEquipView,
+    CosmeticListView,
     DailyTestStartView,
     DailyTestSubmitView,
     DailyTestView,
@@ -82,6 +84,14 @@ urlpatterns = [
 
     # Achievements
     path("achievements/", AchievementListView.as_view(), name="achievement_list"),
+
+    # Cosmetics
+    path("cosmetics/", CosmeticListView.as_view(), name="cosmetic_list"),
+    path(
+        "cosmetics/<slug:slug>/equip/",
+        CosmeticEquipView.as_view(),
+        name="cosmetic_equip",
+    ),
 
     # XP ledger
     path("xp/ledger/", XPLedgerView.as_view(), name="xp_ledger"),

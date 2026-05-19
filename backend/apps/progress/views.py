@@ -43,6 +43,13 @@ from apps.progress.serializers import (
     StreakSerializer,
 )
 from apps.progress.badges.service import evaluate_badges_for_event, serialize_badges
+from apps.progress.cosmetics.service import (
+    CosmeticEquipError,
+    build_catalog_state,
+    equip_cosmetic,
+    owned_slugs,
+    serialize_cosmetics,
+)
 from apps.progress.streak_service import (
     _today_local,
     evaluate_streak_badges_for,
@@ -165,6 +172,12 @@ class LessonOpenView(APIView):
         except Lesson.DoesNotExist:
             return Response({"error": "Lecția nu există."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Snapshot owned cosmetics for the post-request diff. Any unlock
+        # the XP grant or badge evaluator triggers below will show up in
+        # `newly_unlocked_cosmetics`. One indexed query; non-students
+        # get the empty set and a stable empty diff.
+        cosmetics_before = owned_slugs(request.user)
+
         progress, created = LessonProgress.objects.get_or_create(
             student=request.user,
             lesson=lesson,
@@ -208,6 +221,9 @@ class LessonOpenView(APIView):
             "lesson_id": lesson_id,
             "status": progress.status,
             "newly_earned_badges": serialize_badges(streak_badges + own_badges),
+            "newly_unlocked_cosmetics": serialize_cosmetics(
+                owned_slugs(request.user) - cosmetics_before
+            ),
             "xp_gained": xp_gained,
         })
 
@@ -490,6 +506,10 @@ class ExerciseAttemptView(APIView):
                 "error": error if not is_correct else None,
             })
 
+        # Past the preview-only early return — every code path from here
+        # writes an attempt and may trigger XP / badge / cosmetic unlocks.
+        cosmetics_before = owned_slugs(request.user)
+
         ExerciseAttempt.objects.create(
             student=request.user,
             exercise=exercise,
@@ -601,6 +621,9 @@ class ExerciseAttemptView(APIView):
             "hint_active_for_category": hint_active_for_category,
             "error": error if not is_correct else None,
             "newly_earned_badges": serialize_badges(streak_badges + own_badges),
+            "newly_unlocked_cosmetics": serialize_cosmetics(
+                owned_slugs(request.user) - cosmetics_before
+            ),
             "xp_gained": xp_gained,
         })
 
@@ -1277,6 +1300,11 @@ class DailyTestSubmitView(APIView):
                 "pending_exercises": [],
             })
 
+        # Snapshot owned cosmetics for the post-request diff. The
+        # completion path below grants streak XP and a streak badge cascade,
+        # both of which may unlock cosmetics.
+        cosmetics_before = owned_slugs(request.user)
+
         raw_answers = request.data.get("answers") or {}
         if not isinstance(raw_answers, dict):
             return Response(
@@ -1370,6 +1398,9 @@ class DailyTestSubmitView(APIView):
             "total_count": total,
             "pending_exercises": regenerated_pending,
             "newly_earned_badges": serialize_badges(streak_badges),
+            "newly_unlocked_cosmetics": serialize_cosmetics(
+                owned_slugs(request.user) - cosmetics_before
+            ),
             "xp_gained": xp_gained,
         })
 
@@ -1469,6 +1500,11 @@ class TestFinishView(APIView):
         if not attempt:
             return Response({"error": "Nu există un test activ."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Snapshot owned cosmetics for the post-request diff — the
+        # finish path grants streak/test-passed XP and fires the badge
+        # evaluator, either of which may unlock cosmetics.
+        cosmetics_before = owned_slugs(request.user)
+
         test = attempt.test
         instances = attempt.exercise_instances
         answers = dict(attempt.answers)
@@ -1560,6 +1596,9 @@ class TestFinishView(APIView):
             "pass_threshold": test.pass_threshold,
             "answers": graded_answers,
             "newly_earned_badges": serialize_badges(streak_badges + own_badges),
+            "newly_unlocked_cosmetics": serialize_cosmetics(
+                owned_slugs(request.user) - cosmetics_before
+            ),
             "xp_gained": xp_gained,
         })
 
@@ -1775,6 +1814,62 @@ class AchievementListView(APIView):
         return Response({"achievements": achievements})
 
 
+# ─── Cosmetics ────────────────────────────────────────────────────────────────
+
+class CosmeticListView(APIView):
+    """
+    GET /api/v1/progress/cosmetics/
+
+    Catalog-shaped list of every cosmetic with the student's owned and
+    equipped state. For locked entries it includes a displayable unlock
+    requirement: xp_threshold carries its number, while achievement and
+    quest_reward conditions are resolved to the badge's display name /
+    quest's title via runtime catalog lookups. Also returns the
+    currently-equipped cosmetic per type and the profile's
+    `avatar_source` so the frontend can render the active look without a
+    second call.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au cosmetice."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(build_catalog_state(request.user))
+
+
+class CosmeticEquipView(APIView):
+    """
+    POST /api/v1/progress/cosmetics/<slug>/equip/
+
+    Equips a cosmetic the student owns. Rejected with 404 on an unknown
+    slug and 403 on a not-owned cosmetic. The one-equipped-per-type
+    invariant is held transactionally — the existing equipped cosmetic
+    of the same type is cleared first, then the target is set — so the
+    `uniq_one_equipped_per_type` partial index can never reject. An
+    avatar equip also flips `avatar_source` to PRESET on the profile so
+    the displayed avatar actually resolves to the preset.
+
+    Returns the post-equip equipped snapshot and avatar_source — the
+    same shape the list endpoint exposes.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, slug):
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii pot echipa cosmetice."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            data = equip_cosmetic(request.user, slug)
+        except CosmeticEquipError as exc:
+            return Response({"error": exc.message}, status=exc.status_code)
+        return Response(data)
+
+
 # ─── XP ledger ────────────────────────────────────────────────────────────────
 
 class _XPLedgerPagination(PageNumberPagination):
@@ -1910,6 +2005,14 @@ class QuestClaimView(APIView):
                 {"error": "Doar elevii au misiuni."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        # Snapshot owned cosmetics for the post-request diff. A claim
+        # may unlock a quest_reward cosmetic directly (the claim's
+        # post-commit hook) and the paid xp_reward may cross an
+        # xp_threshold (via award_xp's own post-commit hook); the diff
+        # catches both uniformly.
+        cosmetics_before = owned_slugs(request.user)
+
         try:
             data = claim_quest(request.user, assignment_id)
         except QuestClaimError as exc:
@@ -1920,6 +2023,9 @@ class QuestClaimView(APIView):
         if data["assignment"]["cadence"] == "daily":
             _safe_record_quest_progress(request.user, "daily_quest_claimed")
 
+        data["newly_unlocked_cosmetics"] = serialize_cosmetics(
+            owned_slugs(request.user) - cosmetics_before
+        )
         return Response(data)
 
 
