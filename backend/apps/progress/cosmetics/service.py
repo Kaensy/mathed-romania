@@ -23,7 +23,9 @@ registration serializer), so its top-level model imports run well after
 the app registry is ready — the same discipline as quests.service.
 """
 import logging
+import uuid
 
+from django.core.files.base import ContentFile
 from django.db import transaction
 
 from apps.progress.badges.catalog import CATALOG as BADGE_CATALOG
@@ -32,6 +34,10 @@ from apps.progress.quests.catalog import QUEST_CATALOG
 from apps.progress.quests.models import QuestAssignment
 from apps.users.models import StudentProfile
 
+from .avatar import (  # noqa: F401  -- InvalidAvatarUpload re-exported for views
+    InvalidAvatarUpload,
+    normalize_avatar_upload,
+)
 from .catalog import COSMETIC_CATALOG, UnlockCondition
 from .models import StudentCosmetic
 
@@ -258,10 +264,31 @@ def _unlock_display(cond: UnlockCondition) -> dict | None:
     return None
 
 
+def _avatar_state(profile) -> dict:
+    """The shared `avatar_source` + `avatar_image_url` block.
+
+    Centralised so the four endpoints that surface avatar state (list,
+    equip, upload, source-switch) all expose the same shape. A non-
+    student or a profile without an upload still returns the keys —
+    just with None values — so the frontend never has to branch on
+    presence vs. absence.
+    """
+    if profile is None:
+        return {"avatar_source": None, "avatar_image_url": None}
+    img = profile.avatar_image
+    # `bool(ImageField)` is False when no file is associated; `.url`
+    # raises on an empty field, so guard it.
+    return {
+        "avatar_source": profile.avatar_source,
+        "avatar_image_url": img.url if img else None,
+    }
+
+
 def build_catalog_state(user) -> dict:
     """The list endpoint body: every catalog entry annotated with this
     student's owned/equipped state, plus a snapshot of the currently
-    equipped cosmetic per type and `avatar_source`.
+    equipped cosmetic per type and the avatar block
+    (`avatar_source` + `avatar_image_url`).
 
     One cosmetic-rows query, one profile fetch (already done by
     `_resolve_profile`). For a non-student the per-student annotations
@@ -270,13 +297,11 @@ def build_catalog_state(user) -> dict:
     profile = _resolve_profile(user)
     if profile is None:
         owned_state: dict[str, bool] = {}
-        avatar_source = None
     else:
         rows = StudentCosmetic.objects.filter(student=profile).values_list(
             "cosmetic_slug", "is_equipped"
         )
         owned_state = {slug: is_eq for slug, is_eq in rows}
-        avatar_source = profile.avatar_source
 
     equipped_by_type: dict[str, str | None] = {
         "frame": None,
@@ -301,7 +326,7 @@ def build_catalog_state(user) -> dict:
     return {
         "cosmetics": cosmetics,
         "equipped": equipped_by_type,
-        "avatar_source": avatar_source,
+        **_avatar_state(profile),
     }
 
 
@@ -387,5 +412,104 @@ def equip_cosmetic(user, slug: str) -> dict:
     profile.refresh_from_db(fields=["avatar_source"])
     return {
         "equipped": equipped_by_type,
-        "avatar_source": profile.avatar_source,
+        **_avatar_state(profile),
     }
+
+
+# ── Avatar upload + source switching ────────────────────────────────────────
+
+class AvatarSourceError(Exception):
+    """An avatar-source switch was rejected. Carries the Romanian
+    message and the HTTP status the view should surface (mirrors
+    CosmeticEquipError / QuestClaimError)."""
+
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
+def upload_avatar(user, uploaded_file) -> dict:
+    """Validate + normalise an uploaded avatar, persist it, and flip
+    `avatar_source` to UPLOAD. Returns the post-upload avatar state.
+
+    Replaces any previously-stored avatar — the old file is deleted from
+    storage before the new one is saved so we don't accumulate orphans.
+    The stored filename is a fresh UUID, never derived from what the
+    student uploaded (defence-in-depth against path-traversal and
+    information leakage). The InvalidAvatarUpload raised by the
+    normaliser propagates to the view as-is so the 400 reason is the
+    pipeline's own Romanian message.
+    """
+    profile = _resolve_profile(user)
+    if profile is None:
+        raise AvatarSourceError("Doar elevii pot încărca avatare.", 403)
+
+    data, ext = normalize_avatar_upload(uploaded_file)
+
+    # Delete the previous file first. Best-effort: a storage hiccup
+    # here shouldn't block the new upload — we'd rather have an orphan
+    # than reject a valid replacement.
+    if profile.avatar_image:
+        try:
+            profile.avatar_image.delete(save=False)
+        except Exception:
+            logger.warning(
+                "Failed to delete previous avatar for profile #%s",
+                profile.pk,
+                exc_info=True,
+            )
+
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    # ImageField.save() routes through `field.generate_filename`, which
+    # prepends `upload_to="avatars/"` — the resulting path on disk is
+    # MEDIA_ROOT/avatars/<uuid>.<ext>.
+    profile.avatar_image.save(filename, ContentFile(data), save=False)
+    profile.avatar_source = StudentProfile.AvatarSource.UPLOAD
+    profile.save(update_fields=["avatar_image", "avatar_source"])
+    return _avatar_state(profile)
+
+
+def set_avatar_source(user, source: str) -> dict:
+    """Switch the displayed-avatar source.
+
+    Validates that the requested source is reachable given the
+    student's current state:
+    - MONOGRAM is always available — every student can fall back to it.
+    - UPLOAD requires a stored `avatar_image`.
+    - PRESET requires an equipped avatar-type cosmetic. (Equipping an
+      avatar already flips the source to PRESET in equip_cosmetic, so
+      this endpoint mainly covers moving *back* to MONOGRAM or to an
+      existing UPLOAD.)
+    """
+    profile = _resolve_profile(user)
+    if profile is None:
+        raise AvatarSourceError(
+            "Doar elevii au sursă de avatar.", 403,
+        )
+
+    valid_sources = {choice.value for choice in StudentProfile.AvatarSource}
+    if source not in valid_sources:
+        raise AvatarSourceError("Sursă de avatar invalidă.", 400)
+
+    if source == StudentProfile.AvatarSource.UPLOAD and not profile.avatar_image:
+        raise AvatarSourceError(
+            "Nu există o imagine încărcată — încarcă una mai întâi.",
+            400,
+        )
+
+    if source == StudentProfile.AvatarSource.PRESET:
+        has_avatar_equipped = StudentCosmetic.objects.filter(
+            student=profile,
+            cosmetic_type="avatar",
+            is_equipped=True,
+        ).exists()
+        if not has_avatar_equipped:
+            raise AvatarSourceError(
+                "Echipează mai întâi un avatar preset.", 400,
+            )
+
+    if profile.avatar_source != source:
+        profile.avatar_source = source
+        profile.save(update_fields=["avatar_source"])
+    return _avatar_state(profile)

@@ -44,11 +44,15 @@ from apps.progress.serializers import (
 )
 from apps.progress.badges.service import evaluate_badges_for_event, serialize_badges
 from apps.progress.cosmetics.service import (
+    AvatarSourceError,
     CosmeticEquipError,
+    InvalidAvatarUpload,
     build_catalog_state,
     equip_cosmetic,
     owned_slugs,
     serialize_cosmetics,
+    set_avatar_source,
+    upload_avatar,
 )
 from apps.progress.streak_service import (
     _today_local,
@@ -1866,6 +1870,81 @@ class CosmeticEquipView(APIView):
         try:
             data = equip_cosmetic(request.user, slug)
         except CosmeticEquipError as exc:
+            return Response({"error": exc.message}, status=exc.status_code)
+        return Response(data)
+
+
+class AvatarUploadView(APIView):
+    """
+    POST /api/v1/progress/avatar/upload/   (multipart, field `avatar`)
+
+    Validates the uploaded file as an actual image (Pillow, never the
+    Content-Type header), enforces a 5 MB cap, guards against
+    decompression-bomb dimensions, then normalises every accepted
+    upload: EXIF orientation applied, center-cropped to a 256×256
+    square, metadata stripped, re-encoded to JPEG. Saved under a
+    UUID-named file (never the student's original name); replaces any
+    previously-stored avatar. On success `avatar_source` is flipped to
+    UPLOAD and the post-upload avatar block is returned (the same shape
+    surfaced by the list/equip endpoints). Corrupt / non-image / too-
+    large input yields a clean 400.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii pot încărca avatare."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        uploaded = request.FILES.get("avatar")
+        if uploaded is None:
+            return Response(
+                {"error": "Câmpul 'avatar' este obligatoriu."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            data = upload_avatar(request.user, uploaded)
+        except InvalidAvatarUpload as exc:
+            # The pipeline's own Romanian message is the user-facing reason.
+            return Response(
+                {"error": exc.message_ro},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except AvatarSourceError as exc:
+            return Response({"error": exc.message}, status=exc.status_code)
+        return Response(data)
+
+
+class AvatarSourceView(APIView):
+    """
+    POST /api/v1/progress/avatar/source/   body: {"source": "monogram"|"upload"|"preset"}
+
+    Sets which of the three sources the displayed avatar resolves from.
+    MONOGRAM is always reachable; UPLOAD requires a stored image;
+    PRESET requires an equipped avatar-type cosmetic (note that
+    equipping such a cosmetic already flips the source to PRESET in
+    CosmeticEquipView, so this endpoint mainly covers moving back to
+    MONOGRAM or to an existing UPLOAD). Returns the post-switch avatar
+    block — the same shape surfaced everywhere else.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if not getattr(request.user, "is_student", False):
+            return Response(
+                {"error": "Doar elevii au sursă de avatar."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        source = request.data.get("source")
+        if not isinstance(source, str):
+            return Response(
+                {"error": "Câmpul 'source' este obligatoriu."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            data = set_avatar_source(request.user, source)
+        except AvatarSourceError as exc:
             return Response({"error": exc.message}, status=exc.status_code)
         return Response(data)
 
