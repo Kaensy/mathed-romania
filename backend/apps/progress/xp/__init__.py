@@ -5,6 +5,18 @@ No view wiring or pet system here — those land in later phases.
 """
 from .awards import XP_AWARDS
 from .models import XPLedger
-from .service import award_xp, student_grade
+from .service import (
+    award_xp,
+    content_grade_for_topic,
+    content_grade_for_unit,
+    student_grade,
+)
 
-__all__ = ["XP_AWARDS", "XPLedger", "award_xp", "student_grade"]
+__all__ = [
+    "XP_AWARDS",
+    "XPLedger",
+    "award_xp",
+    "content_grade_for_topic",
+    "content_grade_for_unit",
+    "student_grade",
+]

@@ -16,7 +16,7 @@ import logging
 
 from django.db import IntegrityError, transaction
 
-from apps.content.models import Grade
+from apps.content.models import Grade, Topic, Unit
 from apps.pets.levels import level_for_xp
 from apps.pets.models import Pet
 from apps.users.models import StudentProfile
@@ -43,6 +43,36 @@ def student_grade(user):
     if profile is None:
         return None
     return Grade.objects.filter(number=profile.grade).first()
+
+
+def content_grade_for_topic(topic_id):
+    """Resolve the `content.Grade` for a topic via topic → unit → grade.
+
+    Content-based XP (lesson opens, category-tier clears, topic-test
+    progression) routes to the *content's* grade ledger/pet, not the
+    student's current grade — a Grade-7 student reviewing Grade-5
+    content earns onto the Grade-5 pet. `total_xp` is unaffected; it
+    accumulates every grant regardless of grade.
+
+    Returns None for an unknown topic id (caller treats None as "skip").
+    """
+    topic = (
+        Topic.objects
+        .select_related("unit__grade")
+        .filter(pk=topic_id)
+        .first()
+    )
+    return topic.unit.grade if topic is not None else None
+
+
+def content_grade_for_unit(unit_id):
+    """Resolve the `content.Grade` for a unit via unit → grade.
+
+    Companion to `content_grade_for_topic` for unit-scoped test XP.
+    Returns None for an unknown unit id.
+    """
+    unit = Unit.objects.select_related("grade").filter(pk=unit_id).first()
+    return unit.grade if unit is not None else None
 
 
 def award_xp(user, source: str, context: dict, grade) -> int:

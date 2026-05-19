@@ -48,7 +48,11 @@ from apps.progress.streak_service import (
     evaluate_streak_badges_for,
     record_activity,
 )
-from apps.progress.xp import award_xp, student_grade
+from apps.progress.xp import (
+    award_xp,
+    content_grade_for_topic,
+    content_grade_for_unit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,13 +96,20 @@ def _topic_mastery_after_attempt(attempt) -> str | None:
     return tier
 
 
-def _award_test_passed_xp(user, attempt, grade) -> int:
+def _award_test_passed_xp(user, attempt) -> int:
     """Awards topic_passed/mastered/perfect (cumulatively, per current
     mastery state) for a topic test, or unit_passed for a unit test.
-    Returns total XP granted by this call (0s from idempotency dedupe)."""
+
+    Test progression is content-based, so XP routes to the *content's*
+    grade (unit → grade for a unit test, topic → unit → grade for a
+    topic test), not the student's current grade. Returns total XP
+    granted by this call (0s from idempotency dedupe, or an
+    unresolvable content grade)."""
     test = attempt.test
-    total = 0
     if test.scope == "unit" and test.unit_id is not None:
+        grade = content_grade_for_unit(test.unit_id)
+        if grade is None:
+            return 0
         return award_xp(
             user, "unit_passed", {"unit_id": test.unit_id}, grade,
         )
@@ -107,6 +118,11 @@ def _award_test_passed_xp(user, attempt, grade) -> int:
     if tier is None:
         return 0
 
+    grade = content_grade_for_topic(test.topic_id)
+    if grade is None:
+        return 0
+
+    total = 0
     ctx = {"topic_id": test.topic_id}
     total += award_xp(user, "topic_passed", ctx, grade)
     if tier in ("mastered", "perfect"):
@@ -164,7 +180,7 @@ class LessonOpenView(APIView):
             except Exception:
                 logger.warning("Streak update failed", exc_info=True)
 
-            grade = student_grade(request.user)
+            grade = content_grade_for_topic(lesson.topic_id)
             if grade is not None:
                 try:
                     xp_gained += award_xp(
@@ -482,8 +498,11 @@ class ExerciseAttemptView(APIView):
             session_id=session_id,
         )
 
-        # Any submitted practice attempt counts toward the exercise quest.
-        _safe_record_quest_progress(request.user, "exercise_completed")
+        # Only a *correct* attempt counts toward the exercise quest —
+        # its copy says "Rezolvă corect ...". The view already graded
+        # the attempt above.
+        if is_correct:
+            _safe_record_quest_progress(request.user, "exercise_completed")
 
         xp_gained = 0
         streak_badges: list[str] = []
@@ -492,26 +511,6 @@ class ExerciseAttemptView(APIView):
             streak_badges = evaluate_streak_badges_for(request.user)
         except Exception:
             logger.warning("Streak update failed", exc_info=True)
-
-        grade = student_grade(request.user)
-        if grade is not None:
-            today_iso = _today_local().isoformat()
-            try:
-                xp_gained += award_xp(
-                    request.user,
-                    "daily_first_exercise_try",
-                    {"date": today_iso, "grade_id": grade.id},
-                    grade,
-                )
-                if is_correct:
-                    xp_gained += award_xp(
-                        request.user,
-                        "daily_first_exercise_complete",
-                        {"date": today_iso, "grade_id": grade.id},
-                        grade,
-                    )
-            except Exception:
-                logger.warning("XP award failed", exc_info=True)
 
         # ── Category stats update (atomic, F-expressions) ────────────
         if exercise.category:
@@ -567,18 +566,22 @@ class ExerciseAttemptView(APIView):
         if session_id:
             tier_cleared = self._check_tier_cleared(request.user, session_id, exercise)
 
-        if tier_cleared and grade is not None and exercise.category:
-            tiers_to_award = [tier_cleared["tier"], *tier_cleared.get("also_cleared", [])]
-            for tier in tiers_to_award:
-                try:
-                    xp_gained += award_xp(
-                        request.user,
-                        f"category_{tier}_tier_cleared",
-                        {"category_id": exercise.category},
-                        grade,
-                    )
-                except Exception:
-                    logger.warning("XP award failed", exc_info=True)
+        if tier_cleared and exercise.category:
+            # Tier clears are content-based — route to the content's
+            # grade (exercise → topic → unit → grade), not the student's.
+            grade = content_grade_for_topic(exercise.topic_id)
+            if grade is not None:
+                tiers_to_award = [tier_cleared["tier"], *tier_cleared.get("also_cleared", [])]
+                for tier in tiers_to_award:
+                    try:
+                        xp_gained += award_xp(
+                            request.user,
+                            f"category_{tier}_tier_cleared",
+                            {"category_id": exercise.category},
+                            grade,
+                        )
+                    except Exception:
+                        logger.warning("XP award failed", exc_info=True)
 
         correct_display = _correct_answer_display(exercise.exercise_type, grading_data) if not is_correct else None
 
@@ -1354,18 +1357,9 @@ class DailyTestSubmitView(APIView):
                 streak_badges = evaluate_streak_badges_for(request.user)
             except Exception:
                 logger.warning("Streak update failed", exc_info=True)
-
-            grade = student_grade(request.user)
-            if grade is not None:
-                try:
-                    xp_gained += award_xp(
-                        request.user,
-                        "daily_test_complete",
-                        {"date": today.isoformat(), "grade_id": grade.id},
-                        grade,
-                    )
-                except Exception:
-                    logger.warning("XP award failed", exc_info=True)
+            # No direct XP here — the daily loop's XP now comes from the
+            # daily-test quests (started/completed/passed) and the
+            # milestone bar, not a `daily_test_complete` grant.
         else:
             session.save(update_fields=["exercise_instances", "completed_indices", "answers"])
 
@@ -1546,12 +1540,10 @@ class TestFinishView(APIView):
 
         if passed:
             _safe_record_quest_progress(request.user, "test_passed")
-            grade = student_grade(request.user)
-            if grade is not None:
-                try:
-                    xp_gained += _award_test_passed_xp(request.user, attempt, grade)
-                except Exception:
-                    logger.warning("XP award failed", exc_info=True)
+            try:
+                xp_gained += _award_test_passed_xp(request.user, attempt)
+            except Exception:
+                logger.warning("XP award failed", exc_info=True)
 
         own_badges: list[str] = []
         try:

@@ -5,10 +5,13 @@ Public API:
     record_activity(user, activity_type) -> int
     evaluate_streak_badges_for(user) -> list[str]
 
-`record_activity` updates the streak counter for today and attempts the
-`daily_first_login` XP grant. It returns the XP integer granted by this
-call (0 on duplicate or non-student). Streak badge evaluation moved out
-into `evaluate_streak_badges_for` so views can sequence it independently.
+`record_activity` updates the streak counter for today. It no longer
+grants any XP (the `daily_first_login` source was retired in the
+Block 11 XP-correction patch — the daily loop's XP now comes from quest
+claims and the milestone bar). It still returns an int for call-site
+compatibility (`xp_gained += record_activity(...)`), now always 0.
+Streak badge evaluation moved out into `evaluate_streak_badges_for` so
+views can sequence it independently.
 
 All dates are computed in Europe/Bucharest local time.
 """
@@ -20,7 +23,6 @@ from django.utils import timezone
 
 from .badges.service import evaluate_badges_for_event
 from .models import Streak, StreakActivity
-from .xp import award_xp, student_grade
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,9 @@ def record_activity(user, activity_type: str) -> int:
             else:
                 gap = (today - last).days
                 if gap <= 0:
-                    return _try_daily_first_login(user, today)
+                    # Already active today — streak already counted, and
+                    # there is no longer any per-day XP to grant.
+                    return 0
                 if gap == 1:
                     streak.current_streak += 1
                 elif gap == 2 and streak.freeze_count > 0:
@@ -71,21 +75,9 @@ def record_activity(user, activity_type: str) -> int:
             streak.last_active_date = today
             streak.save()
     except IntegrityError:
-        return _try_daily_first_login(user, today)
-
-    return _try_daily_first_login(user, today)
-
-
-def _try_daily_first_login(user, today) -> int:
-    grade = student_grade(user)
-    if grade is None:
         return 0
-    return award_xp(
-        user,
-        "daily_first_login",
-        {"date": today.isoformat(), "grade_id": grade.id},
-        grade,
-    )
+
+    return 0
 
 
 def evaluate_streak_badges_for(user) -> list[str]:

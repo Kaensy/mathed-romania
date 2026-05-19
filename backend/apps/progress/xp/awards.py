@@ -30,27 +30,13 @@ class XPAwardDef(TypedDict):
 
 
 XP_AWARDS: dict[str, XPAwardDef] = {
-    # ── Daily (resets each Europe/Bucharest day; ctx requires `date` + `grade_id`) ──
-    "daily_first_login": {
-        "amount": 5,
-        "key_builder": lambda ctx: f"daily_first_login:{ctx['date']}:grade_{ctx['grade_id']}",
-        "display_name": "Bun venit zilnic",
-    },
-    "daily_first_exercise_try": {
-        "amount": 5,
-        "key_builder": lambda ctx: f"daily_first_exercise_try:{ctx['date']}:grade_{ctx['grade_id']}",
-        "display_name": "Prima încercare a zilei",
-    },
-    "daily_first_exercise_complete": {
-        "amount": 10,
-        "key_builder": lambda ctx: f"daily_first_exercise_complete:{ctx['date']}:grade_{ctx['grade_id']}",
-        "display_name": "Primul exercițiu rezolvat",
-    },
-    "daily_test_complete": {
-        "amount": 30,
-        "key_builder": lambda ctx: f"daily_test_complete:{ctx['date']}:grade_{ctx['grade_id']}",
-        "display_name": "Test zilnic completat",
-    },
+    # NOTE: the four daily_* sources (first_login / first_exercise_try /
+    # first_exercise_complete / test_complete) were retired in the
+    # Block 11 XP-correction patch — the daily loop's XP now comes
+    # solely from quest claims (`quest_completed`) and the milestone bar
+    # (`daily_milestone`). Historical XPLedger rows still carry the old
+    # slugs; the ledger view falls back to the raw slug for any source
+    # not in this dict, so old rows render without a KeyError.
     # ── Per-category tier clears (once per (student, category, tier)) ──────────
     "category_easy_tier_cleared": {
         "amount": 25,

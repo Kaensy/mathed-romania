@@ -1,10 +1,15 @@
-"""End-to-end tests for Block 10 Phase 2 view wiring.
+"""End-to-end tests for the XP/quest view wiring.
 
-Each test class exercises one of the five wiring sites and verifies:
-  (a) the right XP source(s) fire on the intended trigger
+Each test class exercises one of the wiring sites and verifies:
+  (a) the right XP source(s) fire (or, post Block-11 correction, that a
+      retired source no longer fires) on the intended trigger
   (b) idempotency holds end-to-end (no double-award on repeated calls)
   (c) the response's `xp_gained` matches actual ledger writes for that
       request
+
+The four daily_* XP sources were retired in the Block 11 XP-correction
+patch (the daily loop's XP now comes from quest claims + the milestone
+bar), so several cases below assert their *absence* instead.
 """
 from datetime import date
 
@@ -19,8 +24,10 @@ from apps.progress.models import (
     CategoryProgress,
     DailyTestSession,
     LessonProgress,
+    QuestAssignment,
     TestAttempt,
 )
+from apps.progress.quests.service import sync_quests
 from apps.progress.streak_service import _today_local
 from apps.progress.xp import XPLedger
 from apps.users.models import StudentProfile
@@ -85,14 +92,15 @@ class LessonOpenWiringTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.student)
 
-    def test_first_open_fires_lesson_first_open_and_daily_first_login(self):
+    def test_first_open_fires_only_lesson_first_open(self):
+        # daily_first_login was retired — lesson_first_open is the only
+        # XP source on a first lesson open now.
         url = reverse("lesson_open", args=[self.lesson.id])
         resp = self.client.post(url)
         self.assertEqual(resp.status_code, 200)
 
         sources = set(XPLedger.objects.values_list("source", flat=True))
-        self.assertIn("lesson_first_open", sources)
-        self.assertIn("daily_first_login", sources)
+        self.assertEqual(sources, {"lesson_first_open"})
 
         ledger_total = sum(XPLedger.objects.values_list("amount", flat=True))
         self.assertEqual(resp.data["xp_gained"], ledger_total)
@@ -150,36 +158,45 @@ class ExerciseAttemptWiringTests(TestCase):
             reverse("exercise_attempt"), payload, format="json",
         )
 
-    def test_first_correct_attempt_fires_try_and_complete_and_login(self):
+    def _daily_exercise_assignment(self):
+        return QuestAssignment.objects.get(
+            student__user=self.student, quest_slug="daily_exercise",
+        )
+
+    def test_plain_correct_attempt_writes_no_xp(self):
+        # The daily_first_exercise_* sources were retired and there is no
+        # session, so a lone correct attempt grants no XP.
         resp = self._attempt(correct=True)
         self.assertEqual(resp.status_code, 200)
-        sources = set(XPLedger.objects.values_list("source", flat=True))
-        self.assertEqual(
-            sources,
-            {"daily_first_login", "daily_first_exercise_try", "daily_first_exercise_complete"},
-        )
-        self.assertEqual(
-            resp.data["xp_gained"],
-            sum(XPLedger.objects.values_list("amount", flat=True)),
-        )
+        self.assertFalse(XPLedger.objects.exists())
+        self.assertEqual(resp.data["xp_gained"], 0)
 
-    def test_first_wrong_attempt_only_fires_try(self):
+    def test_plain_wrong_attempt_writes_no_xp(self):
         resp = self._attempt(correct=False)
         self.assertEqual(resp.status_code, 200)
-        sources = set(XPLedger.objects.values_list("source", flat=True))
-        self.assertIn("daily_first_exercise_try", sources)
-        self.assertNotIn("daily_first_exercise_complete", sources)
-        self.assertEqual(
-            resp.data["xp_gained"],
-            sum(XPLedger.objects.values_list("amount", flat=True)),
-        )
+        self.assertFalse(XPLedger.objects.exists())
+        self.assertEqual(resp.data["xp_gained"], 0)
 
-    def test_repeated_attempts_same_day_dont_re_award(self):
+    def test_exercise_quest_only_advances_on_a_correct_attempt(self):
+        # Materialise this student's current-period quests, then verify
+        # the exercise_completed event is gated on correctness.
+        sync_quests(self.student)
+        self.assertEqual(self._daily_exercise_assignment().progress, 0)
+
+        self._attempt(correct=False)
+        self.assertEqual(self._daily_exercise_assignment().progress, 0)
+
+        self._attempt(correct=True)
+        a = self._daily_exercise_assignment()
+        self.assertEqual(a.progress, 1)
+        self.assertEqual(a.status, QuestAssignment.Status.COMPLETED)
+
+    def test_repeated_attempts_same_day_dont_award_xp(self):
         first = self._attempt(correct=True)
-        rows_after_first = XPLedger.objects.count()
         second = self._attempt(correct=True)
+        self.assertEqual(first.data["xp_gained"], 0)
         self.assertEqual(second.data["xp_gained"], 0)
-        self.assertEqual(XPLedger.objects.count(), rows_after_first)
+        self.assertFalse(XPLedger.objects.exists())
 
     def test_clearing_easy_tier_awards_category_easy_tier_cleared(self):
         import uuid
@@ -324,8 +341,10 @@ class DailyTestSubmitWiringTests(TestCase):
             answers=answers,
         )
 
-    def test_completing_last_exercise_fires_daily_test_complete(self):
-        session = self._seed_session(n_correct=1, n_total=2)
+    def test_completing_last_exercise_writes_no_xp(self):
+        # daily_test_complete was retired — finishing the daily test
+        # still flips is_completed but grants no direct XP.
+        self._seed_session(n_correct=1, n_total=2)
         resp = self.client.post(
             reverse("daily_test_submit"),
             {"answers": {"1": "5"}},
@@ -333,14 +352,10 @@ class DailyTestSubmitWiringTests(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.data["is_completed"])
-        sources = set(XPLedger.objects.values_list("source", flat=True))
-        self.assertIn("daily_test_complete", sources)
-        self.assertEqual(
-            resp.data["xp_gained"],
-            sum(XPLedger.objects.values_list("amount", flat=True)),
-        )
+        self.assertFalse(XPLedger.objects.exists())
+        self.assertEqual(resp.data["xp_gained"], 0)
 
-    def test_partial_submission_does_not_fire_daily_test_complete(self):
+    def test_partial_submission_does_not_complete_or_award(self):
         self._seed_session(n_correct=0, n_total=2)
         resp = self.client.post(
             reverse("daily_test_submit"),
@@ -349,10 +364,9 @@ class DailyTestSubmitWiringTests(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(resp.data["is_completed"])
-        sources = set(XPLedger.objects.values_list("source", flat=True))
-        self.assertNotIn("daily_test_complete", sources)
+        self.assertFalse(XPLedger.objects.exists())
 
-    def test_idempotent_completion(self):
+    def test_idempotent_completion_never_writes_xp(self):
         # Build a fresh single-slot session, complete it twice.
         instance = generate_instance(self.exercise)
         DailyTestSession.objects.create(
@@ -366,16 +380,14 @@ class DailyTestSubmitWiringTests(TestCase):
             {"answers": {"0": "5"}},
             format="json",
         )
-        first_xp = first.data["xp_gained"]
-        rows_after_first = XPLedger.objects.count()
+        self.assertTrue(first.data["is_completed"])
+        self.assertEqual(first.data["xp_gained"], 0)
 
-        second = self.client.post(
+        # Second call hits the already-completed early return (no
+        # xp_gained key). Either way, the ledger stays empty.
+        self.client.post(
             reverse("daily_test_submit"),
             {"answers": {"0": "5"}},
             format="json",
         )
-        # The session is already_completed branch returns no xp_gained key
-        # because the early-return path does not hit the award block.
-        # Either way, ledger must not grow.
-        self.assertEqual(XPLedger.objects.count(), rows_after_first)
-        self.assertGreater(first_xp, 0)
+        self.assertFalse(XPLedger.objects.exists())
