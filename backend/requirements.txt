@@ -28,3 +28,6 @@ django-extensions==3.2.3
 ruff==0.9.6
 
 sympy==1.13.3
+
+# Media (StudentProfile avatar ImageField — Block 12)
+Pillow==11.1.0

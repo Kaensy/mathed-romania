@@ -13,6 +13,9 @@ from .quests.models import (  # noqa: F401  -- registers quest models with the p
     DailyChallengeProgress,
     QuestAssignment,
 )
+from .cosmetics.models import (  # noqa: F401  -- registers StudentCosmetic with the progress app
+    StudentCosmetic,
+)
 
 
 class LessonProgress(models.Model):

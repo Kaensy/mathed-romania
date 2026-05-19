@@ -72,6 +72,12 @@ class StudentProfile(models.Model):
         APPROVED = "approved", "Approved"
         DENIED = "denied", "Denied"
 
+    class AvatarSource(models.TextChoices):
+        # The displayed avatar resolves from exactly one of these:
+        MONOGRAM = "monogram", "Monogram"  # default — initials placeholder
+        UPLOAD = "upload", "Uploaded image"  # use `avatar_image`
+        PRESET = "preset", "Equipped preset"  # equipped avatar-type cosmetic
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -93,6 +99,25 @@ class StudentProfile(models.Model):
     )
     consent_date = models.DateTimeField(null=True, blank=True)
     total_xp = models.PositiveIntegerField(default=0, db_index=True)
+
+    # ── Avatar (Block 12) ───────────────────────────────────────────────
+    # `avatar_source` is the single switch deciding which of the three
+    # representations is shown. `avatar_image` only matters when the
+    # source is UPLOAD; the PRESET source resolves to the student's
+    # equipped avatar-type StudentCosmetic. Media storage config and the
+    # upload endpoint land in a later phase — this only declares the
+    # fields.
+    avatar_source = models.CharField(
+        max_length=10,
+        choices=AvatarSource.choices,
+        default=AvatarSource.MONOGRAM,
+    )
+    avatar_image = models.ImageField(
+        upload_to="avatars/",
+        null=True,
+        blank=True,
+        help_text="Set only when avatar_source is 'upload'.",
+    )
 
     class Meta:
         db_table = "student_profiles"
