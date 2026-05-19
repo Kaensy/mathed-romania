@@ -152,6 +152,14 @@ def award_xp(user, source: str, context: dict, grade) -> int:
     except IntegrityError:
         return 0
 
+    # Cosmetic unlocks (Block 12): a fresh grant may push total_xp past
+    # an xp_threshold. Runs after the committed grant so a cosmetic bug
+    # can never roll it back; lazy-imported + self-swallowing, exactly
+    # like _safe_evaluate_badges. Skipped on the duplicate path above
+    # (no total_xp change to react to).
+    from ..cosmetics.service import safe_unlock_cosmetics
+    safe_unlock_cosmetics(user)
+
     return amount
 
 

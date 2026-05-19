@@ -91,6 +91,14 @@ class StudentRegistrationSerializer(serializers.Serializer):
             ),
         )
 
+        # Block 12: give the new student the 7 starter cosmetics and the
+        # two default-equipped ones. Lazy-imported + self-swallowing so a
+        # cosmetic hiccup can never fail sign-up.
+        from apps.progress.cosmetics.service import (
+            safe_provision_student_cosmetics,
+        )
+        safe_provision_student_cosmetics(user)
+
         return user
 
 

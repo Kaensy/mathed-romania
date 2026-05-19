@@ -72,6 +72,15 @@ def evaluate_badges_for_event(user, event_name, context=None) -> list[str]:
         if created:
             newly_earned.append(badge_key)
 
+    # Cosmetic unlocks (Block 12): a newly-earned badge may satisfy an
+    # achievement-gated cosmetic. Full re-evaluation, so we only bother
+    # when something was actually earned. Lazy-imported + self-swallowing
+    # (this module otherwise does not swallow, by contract) so a cosmetic
+    # bug never disturbs badge creation or its caller.
+    if newly_earned:
+        from apps.progress.cosmetics.service import safe_unlock_cosmetics
+        safe_unlock_cosmetics(user)
+
     return newly_earned
 
 

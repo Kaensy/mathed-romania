@@ -276,6 +276,14 @@ def claim_quest(user, assignment_id: int) -> dict:
                 locked_bar.save(update_fields=["points"])
             bar_data = _serialize_bar(locked_bar, today)
 
+    # Cosmetic unlocks (Block 12): the now-committed CLAIMED status may
+    # satisfy a quest_reward cosmetic. Runs after the claim transaction
+    # so a cosmetic bug can never roll the claim back; lazy-imported +
+    # self-swallowing, like the XP/badge hooks. (A claim whose xp_reward
+    # is 0 never calls award_xp, so this is the only unlock path for it.)
+    from apps.progress.cosmetics.service import safe_unlock_cosmetics
+    safe_unlock_cosmetics(user)
+
     return {
         "assignment": _serialize_assignment(locked),
         "xp_gained": xp_gained,
