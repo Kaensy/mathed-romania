@@ -3,12 +3,15 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { GlossaryDrawerProvider } from "@/contexts/GlossaryDrawerContext";
 import { BadgeNotificationProvider } from "@/contexts/BadgeNotificationContext";
+import { CosmeticNotificationProvider } from "@/contexts/CosmeticNotificationContext";
+import { CosmeticsProvider } from "@/contexts/CosmeticsContext";
 import { LevelUpProvider } from "@/contexts/LevelUpContext";
 import { BonusCelebrationProvider } from "@/contexts/BonusCelebrationContext";
 import { XPNotificationProvider } from "@/contexts/XPNotificationContext";
 import GlossaryDrawer from "@/components/GlossaryDrawer";
 import GlossaryFab from "@/components/GlossaryFab";
 import BadgeToast from "@/components/badges/BadgeToast";
+import CosmeticToast from "@/components/cosmetics/CosmeticToast";
 import XPToast from "@/components/pets/XPToast";
 import BonusCelebration from "@/components/quests/BonusCelebration";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -98,22 +101,27 @@ export default function App() {
   return (
     <AuthProvider>
       <BadgeNotificationProvider>
-        <XPNotificationProvider>
-          <LevelUpProvider>
-            <BonusCelebrationProvider>
-              <GlossaryProvider>
-                <GlossaryDrawerProvider>
-                  <AppRoutes />
-                  <GlossaryFab />
-                  <GlossaryDrawer />
-                  <BadgeToast />
-                  <XPToast />
-                  <BonusCelebration />
-                </GlossaryDrawerProvider>
-              </GlossaryProvider>
-            </BonusCelebrationProvider>
-          </LevelUpProvider>
-        </XPNotificationProvider>
+        <CosmeticNotificationProvider>
+          <CosmeticsProvider>
+            <XPNotificationProvider>
+              <LevelUpProvider>
+                <BonusCelebrationProvider>
+                  <GlossaryProvider>
+                    <GlossaryDrawerProvider>
+                      <AppRoutes />
+                      <GlossaryFab />
+                      <GlossaryDrawer />
+                      <BadgeToast />
+                      <CosmeticToast />
+                      <XPToast />
+                      <BonusCelebration />
+                    </GlossaryDrawerProvider>
+                  </GlossaryProvider>
+                </BonusCelebrationProvider>
+              </LevelUpProvider>
+            </XPNotificationProvider>
+          </CosmeticsProvider>
+        </CosmeticNotificationProvider>
       </BadgeNotificationProvider>
     </AuthProvider>
   );

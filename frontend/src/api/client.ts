@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { notifyBadges } from "@/lib/badgeNotifier";
+import { notifyCosmeticsUnlocked } from "@/lib/cosmeticNotifier";
 import { notifyXpGained } from "@/lib/xpNotifier";
 
 const api = axios.create({
@@ -34,6 +35,13 @@ api.interceptors.response.use(
     const newlyEarned = response.data?.newly_earned_badges;
     if (Array.isArray(newlyEarned) && newlyEarned.length > 0) {
       notifyBadges(newlyEarned);
+    }
+    const newlyUnlockedCosmetics = response.data?.newly_unlocked_cosmetics;
+    if (
+      Array.isArray(newlyUnlockedCosmetics) &&
+      newlyUnlockedCosmetics.length > 0
+    ) {
+      notifyCosmeticsUnlocked(newlyUnlockedCosmetics);
     }
     const xpGained = response.data?.xp_gained;
     if (typeof xpGained === "number" && xpGained > 0) {

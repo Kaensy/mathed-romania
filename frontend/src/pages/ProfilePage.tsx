@@ -9,23 +9,30 @@
  *   3. Weak categories list (up to 10)
  *   4. Badges grid (earned + locked)
  */
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
   PenLine,
   BarChart3,
   CheckCircle2,
+  Pencil,
   Target,
   Sparkles,
 } from "lucide-react";
 import api from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCosmetics } from "@/hooks/useCosmetics";
 import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
 import BadgeGrid from "@/components/badges/BadgeGrid";
+import AvatarPreview, {
+  buildPreviewSelection,
+} from "@/components/cosmetics/AvatarPreview";
+import { themeStyleFor } from "@/components/cosmetics/assetRegistry";
+import WardrobeModal from "@/components/cosmetics/WardrobeModal";
 import type {
   DashboardStats,
   WeakCategoriesResponse,
@@ -36,6 +43,8 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { streak, loading: loadingStreak } = useStreak();
+  const { state: cosmeticState } = useCosmetics();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -43,6 +52,45 @@ export default function ProfilePage() {
   const [streakModalOpen, setStreakModalOpen] = useState(false);
 
   const isStudent = user?.user_type === "student";
+
+  // The wardrobe modal's open state lives in the URL so back/refresh
+  // survive the user opening it. `?wardrobe=1` ↔ open.
+  const wardrobeOpen = searchParams.get("wardrobe") === "1";
+  const openWardrobe = () => {
+    const next = new URLSearchParams(searchParams);
+    next.set("wardrobe", "1");
+    setSearchParams(next);
+  };
+  const closeWardrobe = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("wardrobe");
+    setSearchParams(next);
+  };
+
+  // Equipped theme styles the page surface visible behind the modal
+  // (themes have no in-modal preview — the page IS the preview). The
+  // resolved asset_ref drives the lookup; if no theme is equipped (or
+  // for non-students), the fallback gives us the existing bg-gray-50.
+  const themeAssetRef = useMemo(() => {
+    if (!cosmeticState) return null;
+    const slug = cosmeticState.equipped.profile_theme;
+    if (!slug) return null;
+    return (
+      cosmeticState.cosmetics.find((c) => c.slug === slug)?.asset_ref ?? null
+    );
+  }, [cosmeticState]);
+  const themeStyle = themeStyleFor(themeAssetRef);
+
+  // Selection that drives the clickable avatar circle below.
+  const preview = useMemo(() => {
+    if (!cosmeticState) return null;
+    return buildPreviewSelection(
+      cosmeticState.cosmetics,
+      cosmeticState.equipped,
+      cosmeticState.avatar_source,
+      cosmeticState.avatar_image_url,
+    );
+  }, [cosmeticState]);
 
   useEffect(() => {
     if (!isStudent) return;
@@ -74,8 +122,10 @@ export default function ProfilePage() {
       ? "Profesor"
       : "Admin";
 
+  const initials = `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${themeStyle.pageClass}`}>
       {/* Top bar */}
       <header className="sticky top-0 z-10 border-b bg-white">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4">
@@ -93,12 +143,32 @@ export default function ProfilePage() {
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-8">
         {/* ── Section 1: Student info ───────────────────────────── */}
         <section className="rounded-2xl border bg-white p-6 flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-            <span className="text-indigo-700 font-bold text-lg">
-              {user.first_name.charAt(0)}
-              {user.last_name.charAt(0)}
-            </span>
-          </div>
+          {isStudent ? (
+            <button
+              type="button"
+              onClick={openWardrobe}
+              className="group relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              aria-label="Deschide dressing-ul"
+            >
+              <AvatarPreview
+                size="md"
+                avatarSource={preview?.avatarSource ?? null}
+                avatarImageUrl={preview?.avatarImageUrl ?? null}
+                presetAssetRef={preview?.presetAssetRef ?? null}
+                frameAssetRef={preview?.frameAssetRef ?? null}
+                initials={initials}
+              />
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                <Pencil className="h-4 w-4 text-white" aria-hidden />
+              </span>
+            </button>
+          ) : (
+            <div className="w-14 h-14 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+              <span className="text-indigo-700 font-bold text-lg">
+                {initials}
+              </span>
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-gray-900">
@@ -185,6 +255,10 @@ export default function ProfilePage() {
 
       {streakModalOpen && streak && (
         <StreakModal streak={streak} onClose={() => setStreakModalOpen(false)} />
+      )}
+
+      {isStudent && (
+        <WardrobeModal open={wardrobeOpen} onClose={closeWardrobe} />
       )}
     </div>
   );

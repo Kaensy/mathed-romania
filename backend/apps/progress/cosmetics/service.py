@@ -236,23 +236,40 @@ def _unlock_display(cond: UnlockCondition) -> dict | None:
     """Resolve a locked cosmetic's `UnlockCondition` into the displayable
     payload the list endpoint exposes.
 
+    Each non-starter shape carries both a compact `label` (the at-a-
+    glance identifier the card shows under the lock icon) and a fuller
+    `description` (the hover/tap tooltip text). For achievement and
+    quest_reward conditions the description is the badge's / quest's
+    own catalog description — so the wording stays in lockstep with
+    what students see elsewhere. For xp_threshold the description is
+    composed locally because the threshold has no catalog object to
+    pull from.
+
     Runtime catalog lookups (the badge and quest catalogs are imported
     at module top, but the *values* are read here so a catalog edit is
     picked up without restart). A starter cosmetic has no displayable
     requirement — it's owned the moment a profile is provisioned — so
     None is returned. Unknown badge/quest references degrade to the raw
-    key; the displayable surface never raises on catalog drift.
+    key with an empty description; the displayable surface never raises
+    on catalog drift.
     """
     if cond.kind == "starter":
         return None
     if cond.kind == "xp_threshold":
-        return {"kind": "xp_threshold", "xp": cond.xp}
+        return {
+            "kind": "xp_threshold",
+            "xp": cond.xp,
+            # Romanian thousands separator (".") matches how XP totals
+            # are formatted elsewhere in the UI (e.g. "10.000 XP").
+            "description": f"Atinge {cond.xp:,} XP total.".replace(",", "."),
+        }
     if cond.kind == "achievement":
         badge = BADGE_CATALOG.get(cond.badge_key)
         return {
             "kind": "achievement",
             "badge_key": cond.badge_key,
             "label": badge.name if badge is not None else cond.badge_key,
+            "description": badge.description if badge is not None else "",
         }
     if cond.kind == "quest_reward":
         quest = QUEST_CATALOG.get(cond.quest_slug)
@@ -260,6 +277,7 @@ def _unlock_display(cond: UnlockCondition) -> dict | None:
             "kind": "quest_reward",
             "quest_slug": cond.quest_slug,
             "label": quest.title if quest is not None else cond.quest_slug,
+            "description": quest.description if quest is not None else "",
         }
     return None
 

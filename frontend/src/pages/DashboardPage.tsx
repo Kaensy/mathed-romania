@@ -1,14 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { BookOpen, PenLine, BarChart3, Flame, CheckCircle2, Target } from "lucide-react";
 import api from "@/api/client";
 import type { DashboardStats, WeakCategoriesResponse, WeakCategory } from "@/types/progress";
 import type { DailyTestResponse } from "@/types/daily";
+import { useCosmetics } from "@/hooks/useCosmetics";
 import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
 import RecentBadgesWidget from "@/components/badges/RecentBadgesWidget";
+import AvatarPreview, {
+  buildPreviewSelection,
+} from "@/components/cosmetics/AvatarPreview";
 import PetPanel from "@/components/pets/PetPanel";
 import QuestSummaryCard from "@/components/quests/QuestSummaryCard";
 
@@ -20,6 +24,21 @@ export default function DashboardPage() {
   const [weakCategories, setWeakCategories] = useState<WeakCategory[] | null>(null);
   const [streakModalOpen, setStreakModalOpen] = useState(false);
   const { streak, loading: loadingStreak } = useStreak();
+  const { state: cosmeticState } = useCosmetics();
+
+  // Resolve the equipped frame + avatar so the header circle shows the
+  // student's current combo. Reads off the shared CosmeticsContext, so
+  // equipping in the wardrobe modal updates this header in the same
+  // render tick without a page reload.
+  const headerAvatar = useMemo(() => {
+    if (!cosmeticState) return null;
+    return buildPreviewSelection(
+      cosmeticState.cosmetics,
+      cosmeticState.equipped,
+      cosmeticState.avatar_source,
+      cosmeticState.avatar_image_url,
+    );
+  }, [cosmeticState]);
 
   useEffect(() => {
     api
@@ -69,9 +88,21 @@ export default function DashboardPage() {
             </Link>
             <Link
               to="/profile"
-              className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
             >
-              {user.first_name} {user.last_name}
+              {user.user_type === "student" && (
+                <AvatarPreview
+                  size="sm"
+                  avatarSource={headerAvatar?.avatarSource ?? null}
+                  avatarImageUrl={headerAvatar?.avatarImageUrl ?? null}
+                  presetAssetRef={headerAvatar?.presetAssetRef ?? null}
+                  frameAssetRef={headerAvatar?.frameAssetRef ?? null}
+                  initials={`${user.first_name.charAt(0)}${user.last_name.charAt(0)}`}
+                />
+              )}
+              <span>
+                {user.first_name} {user.last_name}
+              </span>
             </Link>
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
               {user.user_type === "student" ? "Elev" : user.user_type === "teacher" ? "Profesor" : "Admin"}
