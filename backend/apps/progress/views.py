@@ -43,6 +43,7 @@ from apps.progress.serializers import (
     StreakSerializer,
 )
 from apps.progress.badges.service import evaluate_badges_for_event, serialize_badges
+from apps.progress.categories.display_names import get_display_name
 from apps.progress.cosmetics.service import (
     AvatarSourceError,
     CosmeticEquipError,
@@ -403,13 +404,30 @@ class TopicCategoriesView(APIView):
         }
 
         categories = []
+        easy_clear_count = 0
+        medium_clear_count = 0
+        hard_clear_count = 0
+        # Empty-category buckets never get a CategoryProgress row, so they
+        # can't be cleared and would block is_perfect — exclude them from
+        # the denominator.
+        total_real_categories = 0
         for cat, ex_ids in category_map.items():
-            label = cat if cat else "Toate exercițiile"
+            label = get_display_name(cat) if cat else "Toate exercițiile"
             cp = cp_map.get(cat)
 
             easy_cleared = cp.easy_cleared if cp else False
             medium_cleared = cp.medium_cleared if cp else False
             hard_cleared = cp.hard_cleared if cp else False
+            all_tiers_cleared = easy_cleared and medium_cleared and hard_cleared
+
+            if cat:
+                total_real_categories += 1
+                if easy_cleared:
+                    easy_clear_count += 1
+                if medium_cleared:
+                    medium_clear_count += 1
+                if hard_cleared:
+                    hard_clear_count += 1
 
             categories.append({
                 "category": cat,
@@ -417,6 +435,10 @@ class TopicCategoriesView(APIView):
                 "exercise_count": len(ex_ids),
                 "exercises_attempted": cat_total[cat],
                 "perfect_batches": cat_perfect[cat],
+                "easy_cleared": easy_cleared,
+                "medium_cleared": medium_cleared,
+                "hard_cleared": hard_cleared,
+                "all_tiers_cleared": all_tiers_cleared,
                 "tiers": {
                     "easy":   {"available": True,          "cleared": easy_cleared},
                     "medium": {"available": easy_cleared,  "cleared": medium_cleared},
@@ -426,10 +448,22 @@ class TopicCategoriesView(APIView):
 
         categories.sort(key=lambda c: ("zzz" if not c["category"] else "", c["label"]))
 
+        is_perfect = (
+            total_real_categories > 0
+            and easy_clear_count == total_real_categories
+            and medium_clear_count == total_real_categories
+            and hard_clear_count == total_real_categories
+        )
+
         return Response({
             "topic_id": topic_id,
             "topic_title": topic.title,
             "categories": categories,
+            "total_categories": total_real_categories,
+            "easy_clear_count": easy_clear_count,
+            "medium_clear_count": medium_clear_count,
+            "hard_clear_count": hard_clear_count,
+            "is_perfect": is_perfect,
         })
 
 
@@ -743,23 +777,10 @@ class WeakCategoriesView(APIView):
         rows.sort(key=_sort_key)
         ranked = rows[:limit]
 
-        unique_categories = {cp.category for cp in ranked}
-        label_map: dict[str, str] = {}
-        if unique_categories:
-            for ex in (
-                Exercise.objects
-                .filter(category__in=unique_categories, is_active=True)
-                .only("category", "template")
-            ):
-                if ex.category in label_map:
-                    continue
-                template = ex.template if isinstance(ex.template, dict) else {}
-                label_map[ex.category] = template.get("category_label", ex.category)
-
         results = [
             {
                 "category": cp.category,
-                "category_label": label_map.get(cp.category, cp.category),
+                "category_label": get_display_name(cp.category),
                 "topic_id": cp.topic_id,
                 "topic_title": cp.topic.title,
                 "accuracy": round(cp.correct_attempts / cp.total_attempts, 2),
@@ -795,20 +816,35 @@ class ExercisesOverviewView(APIView):
         )
         topic_ids = [t.id for t in topics]
 
-        # Total distinct exercise categories per topic
+        # Distinct *non-empty* exercise categories per topic. Empty-category
+        # rows never appear in CategoryProgress (unique_together excludes
+        # them in practice), so excluding them keeps is_perfect honest.
         cat_counts = (
             Exercise.objects
             .filter(topic_id__in=topic_ids, is_active=True)
+            .exclude(category="")
             .values("topic_id")
             .annotate(total=Count("category", distinct=True))
         )
         cat_count_map = {row["topic_id"]: row["total"] for row in cat_counts}
 
-        # Completed categories (medium or hard cleared)
+        # Per-tier clearance counts per topic, plus the "completed"
+        # (medium-or-hard) count used by the existing summary stat.
         completed_by_topic: dict[int, int] = defaultdict(int)
-        for cp in CategoryProgress.objects.filter(student=user, topic_id__in=topic_ids):
+        easy_by_topic: dict[int, int] = defaultdict(int)
+        medium_by_topic: dict[int, int] = defaultdict(int)
+        hard_by_topic: dict[int, int] = defaultdict(int)
+        for cp in CategoryProgress.objects.filter(
+            student=user, topic_id__in=topic_ids,
+        ).exclude(category=""):
             if cp.medium_cleared or cp.hard_cleared:
                 completed_by_topic[cp.topic_id] += 1
+            if cp.easy_cleared:
+                easy_by_topic[cp.topic_id] += 1
+            if cp.medium_cleared:
+                medium_by_topic[cp.topic_id] += 1
+            if cp.hard_cleared:
+                hard_by_topic[cp.topic_id] += 1
 
         # Exercises attempted per topic
         attempt_count_map: dict[int, int] = {}
@@ -820,20 +856,28 @@ class ExercisesOverviewView(APIView):
         ):
             attempt_count_map[row["exercise__topic_id"]] = row["count"]
 
-        results = [
-            {
+        results = []
+        for topic in topics:
+            total = cat_count_map.get(topic.id, 0)
+            easy_c = easy_by_topic.get(topic.id, 0)
+            medium_c = medium_by_topic.get(topic.id, 0)
+            hard_c = hard_by_topic.get(topic.id, 0)
+            is_perfect = total > 0 and easy_c == total and medium_c == total and hard_c == total
+            results.append({
                 "topic_id": topic.id,
                 "topic_title": topic.title,
                 "unit_id": topic.unit_id,
                 "unit_title": topic.unit.title,
                 "unit_order": topic.unit.order,
                 "topic_order": topic.order,
-                "total_categories": cat_count_map.get(topic.id, 0),
+                "total_categories": total,
                 "completed_categories": completed_by_topic.get(topic.id, 0),
+                "easy_clear_count": easy_c,
+                "medium_clear_count": medium_c,
+                "hard_clear_count": hard_c,
+                "is_perfect": is_perfect,
                 "exercises_attempted": attempt_count_map.get(topic.id, 0),
-            }
-            for topic in topics
-        ]
+            })
 
         return Response({"topics": results})
 
@@ -1056,21 +1100,38 @@ class StreakView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        from django.db.models.functions import TruncDate
+
         streak, _ = Streak.objects.get_or_create(student=request.user)
 
         cutoff = _today_local() - timedelta(days=365)
-        active_dates = list(
-            StreakActivity.objects
-            .filter(student=request.user, date__gte=cutoff)
-            .order_by("date")
-            .values_list("date", flat=True)
+
+        # Per-day exercise attempt counts drive heatmap intensity.
+        attempt_rows = (
+            ExerciseAttempt.objects
+            .filter(student=request.user, attempted_at__date__gte=cutoff)
+            .annotate(day=TruncDate("attempted_at"))
+            .values("day")
+            .annotate(count=Count("id"))
         )
+        daily_counts: dict[str, int] = {
+            row["day"].isoformat(): row["count"] for row in attempt_rows
+        }
+
+        # Lesson-only / test-only active days still get a cell at count=1.
+        active_dates = StreakActivity.objects.filter(
+            student=request.user, date__gte=cutoff,
+        ).values_list("date", flat=True)
+        for d in active_dates:
+            key = d.isoformat()
+            if key not in daily_counts:
+                daily_counts[key] = 1
 
         data = {
             "current_streak": streak.current_streak,
             "longest_streak": streak.longest_streak,
             "freeze_count": streak.freeze_count,
-            "active_dates": active_dates,
+            "daily_counts": daily_counts,
         }
 
         serializer = StreakSerializer(data)
@@ -1705,8 +1766,7 @@ def _build_test_instances(composition: list, exercises_pool) -> list:
                 instance["exercise_id"] = ex.id
                 instance["weight"] = weight
                 instance["topic_id"] = ex.topic_id
-                template = ex.template if isinstance(ex.template, dict) else {}
-                instance["category_label"] = template.get("category_label", ex.category)
+                instance["category_label"] = get_display_name(ex.category)
                 instances.append(instance)
             except Exception:
                 continue

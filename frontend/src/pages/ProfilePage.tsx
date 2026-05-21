@@ -33,6 +33,10 @@ import AvatarPreview, {
 } from "@/components/cosmetics/AvatarPreview";
 import { themeStyleFor } from "@/components/cosmetics/assetRegistry";
 import WardrobeModal from "@/components/cosmetics/WardrobeModal";
+import HomeBrand from "@/components/HomeBrand";
+import AccountLevelPanel from "@/components/AccountLevelPanel";
+import PetPanel from "@/components/pets/PetPanel";
+import type { StudentProfile } from "@/types/auth";
 import type {
   DashboardStats,
   WeakCategoriesResponse,
@@ -129,6 +133,7 @@ export default function ProfilePage() {
       {/* Top bar */}
       <header className="sticky top-0 z-10 border-b bg-white">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4">
+          <HomeBrand />
           <button
             onClick={() => navigate("/dashboard")}
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -248,6 +253,12 @@ export default function ProfilePage() {
             )}
           </section>
         )}
+
+        {/* ── Account level + Pet (matched pair) ────────────────── */}
+        {isStudent && user.profile && (
+          <AccountLevelPanel profile={user.profile as StudentProfile} />
+        )}
+        {isStudent && <PetPanel />}
 
         {/* ── Section 4: Badges ─────────────────────────────────── */}
         {isStudent && <BadgeGrid />}

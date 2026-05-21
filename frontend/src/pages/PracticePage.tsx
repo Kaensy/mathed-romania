@@ -21,6 +21,7 @@ import type {
   TierCleared,
 } from "@/types/progress";
 import ExerciseCard from "@/components/exercise/ExerciseCard";
+import HomeBrand from "@/components/HomeBrand";
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   easy: "Ușor",
@@ -172,6 +173,7 @@ export default function PracticePage() {
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
           <button
             onClick={goBackToHub}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
@@ -238,8 +240,15 @@ function CompletionScreen({
   origin,
 }: CompletionScreenProps) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+    <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
+          <span className="text-sm font-medium text-gray-700">Sesiune încheiată</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
         {isPerfect ? (
           <div className="text-5xl mb-4">🎉</div>
         ) : (
@@ -312,6 +321,7 @@ function CompletionScreen({
             Înapoi la exerciții
           </Link>
         </div>
+      </div>
       </div>
     </div>
   );

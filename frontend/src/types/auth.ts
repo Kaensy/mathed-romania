@@ -4,6 +4,11 @@ export interface StudentProfile {
   grade: number;
   birth_date: string;
   consent_status: "pending" | "approved" | "denied";
+  total_xp: number;
+  account_level: number;
+  xp_into_level: number;
+  xp_for_next_level: number;
+  xp_to_next_level: number;
 }
 
 export interface TeacherProfile {

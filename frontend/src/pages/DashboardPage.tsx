@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
-import { BookOpen, PenLine, BarChart3, Flame, CheckCircle2, Target } from "lucide-react";
+import { Flame, CheckCircle2, Target } from "lucide-react";
 import api from "@/api/client";
 import type { DashboardStats, WeakCategoriesResponse, WeakCategory } from "@/types/progress";
 import type { DailyTestResponse } from "@/types/daily";
@@ -9,7 +9,7 @@ import { useCosmetics } from "@/hooks/useCosmetics";
 import { useStreak } from "@/hooks/useStreak";
 import StreakBadge from "@/components/streak/StreakBadge";
 import StreakModal from "@/components/streak/StreakModal";
-import RecentBadgesWidget from "@/components/badges/RecentBadgesWidget";
+import HomeBrand from "@/components/HomeBrand";
 import AvatarPreview, {
   buildPreviewSelection,
 } from "@/components/cosmetics/AvatarPreview";
@@ -20,7 +20,6 @@ export default function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loadingStats, setLoadingStats] = useState(true);
   const [weakCategories, setWeakCategories] = useState<WeakCategory[] | null>(null);
   const [streakModalOpen, setStreakModalOpen] = useState(false);
   const { streak, loading: loadingStreak } = useStreak();
@@ -44,8 +43,7 @@ export default function DashboardPage() {
     api
       .get<DashboardStats>("/progress/dashboard/")
       .then((res) => setStats(res.data))
-      .catch(() => {/* non-fatal — show placeholders */})
-      .finally(() => setLoadingStats(false));
+      .catch(() => {/* non-fatal — show placeholders */});
   }, []);
 
   useEffect(() => {
@@ -63,29 +61,25 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  const completionPct = stats
-    ? Math.round((stats.completed_lessons / (stats.total_lessons || 1)) * 100)
-    : 0;
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <h1 className="text-lg font-bold text-indigo-900">MathEd Romania</h1>
+          <HomeBrand />
           <div className="flex items-center gap-4">
-            {user.user_type === "student" && !loadingStreak && streak && (
-              <StreakBadge
-                count={streak.current_streak}
-                onClick={() => setStreakModalOpen(true)}
-              />
-            )}
             <Link
               to="/glossary"
               className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
             >
               Glosar
             </Link>
+            {user.user_type === "student" && !loadingStreak && streak && (
+              <StreakBadge
+                count={streak.current_streak}
+                onClick={() => setStreakModalOpen(true)}
+              />
+            )}
             <Link
               to="/profile"
               className="flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
@@ -118,53 +112,81 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <h2 className="text-2xl font-bold text-gray-900">
-          Bun venit, {user.first_name}!
-        </h2>
-        <p className="mt-1 text-gray-500">
-          {user.user_type === "student"
-            ? "Continuă să înveți matematică."
-            : "Urmărește progresul elevilor tăi."}
-        </p>
+        {/* 1. Top strip — greeting (left) + aggregate stats (right) */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-xl font-bold text-gray-900">
+            Bună, {user.first_name}!
+          </h2>
 
-        {/* Stats row */}
+          {user.user_type === "student" && (
+            <div className="flex items-center gap-5 rounded-xl border bg-white px-5 py-3">
+              <div>
+                <p className="text-xs text-gray-500">Lecții finalizate</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {stats ? `${stats.completed_lessons}/${stats.total_lessons}` : "—"}
+                </p>
+              </div>
+              <div className="h-9 w-px bg-gray-200" />
+              <div>
+                <p className="text-xs text-gray-500">Exerciții rezolvate</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {stats ? String(stats.exercises_attempted) : "—"}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Big curriculum nav row — the headliner */}
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <Link
+            to="/grade/5"
+            className="rounded-2xl border bg-white p-8 hover:border-indigo-300 hover:shadow-md transition-all block"
+          >
+            <div className="mb-4 text-4xl">📚</div>
+            <h3 className="text-lg font-bold text-gray-900">Lecții</h3>
+            <p className="mt-1 text-sm text-gray-500">Clasa a V-a — Matematică</p>
+          </Link>
+          <Link
+            to="/exercises"
+            className="rounded-2xl border bg-white p-8 hover:border-indigo-300 hover:shadow-md transition-all block"
+          >
+            <div className="mb-4 text-4xl">✏️</div>
+            <h3 className="text-lg font-bold text-gray-900">Exerciții</h3>
+            <p className="mt-1 text-sm text-gray-500">Toate exercițiile tale</p>
+          </Link>
+          <div className="flex flex-col">
+            <Link
+              to="/tests"
+              className="rounded-2xl border bg-white p-8 hover:border-indigo-300 hover:shadow-md transition-all block"
+            >
+              <div className="mb-4 text-4xl">🏆</div>
+              <h3 className="text-lg font-bold text-gray-900">Teste</h3>
+              <p className="mt-1 text-sm text-gray-500">Evaluările lecțiilor</p>
+            </Link>
+            {user.user_type === "student" && (
+              <Link
+                to="/test-history"
+                className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline self-end"
+              >
+                Vezi istoricul →
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Pet panel — unchanged widget */}
+        {user.user_type === "student" && <PetPanel />}
+
+        {/* 4. Daily test + Quests — two columns desktop, stacked < md */}
         {user.user_type === "student" && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <StatCard
-              loading={loadingStats}
-              icon={<BookOpen className="w-5 h-5 text-indigo-500" />}
-              label="Lecții finalizate"
-              value={stats ? `${stats.completed_lessons} / ${stats.total_lessons}` : "—"}
-              sub={stats ? `${completionPct}% completat` : undefined}
-            />
-            <StatCard
-              loading={loadingStats}
-              icon={<PenLine className="w-5 h-5 text-emerald-500" />}
-              label="Exerciții rezolvate"
-              value={stats ? String(stats.exercises_attempted) : "—"}
-              sub={stats?.perfect_batches ? `${stats.perfect_batches} sesiuni perfecte` : undefined}
-
-            />
-            <StatCard
-              loading={loadingStats}
-              icon={<BarChart3 className="w-5 h-5 text-amber-500" />}
-              label="În progres"
-              value={stats ? String(stats.in_progress_lessons) : "—"}
-              sub="lecții deschise"
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            <DailyTestCard />
+            <QuestSummaryCard />
           </div>
         )}
 
-        {/* Pet panel — XP / level overview */}
-        {user.user_type === "student" && <PetPanel />}
-
-        {/* Daily test widget */}
-        {user.user_type === "student" && <DailyTestCard />}
-
-        {/* Quests summary widget */}
-        {user.user_type === "student" && <QuestSummaryCard />}
-
-        {/* Recomandat pentru tine — weak categories */}
+        {/* 5. Recomandat pentru tine — weak categories */}
         {user.user_type === "student" && weakCategories && weakCategories.length > 0 && (
           <section className="mt-8">
             <div className="flex items-center gap-2 mb-3">
@@ -180,41 +202,6 @@ export default function DashboardPage() {
             </div>
           </section>
         )}
-
-        {/* Recent badges */}
-        {user.user_type === "student" && <RecentBadgesWidget />}
-
-        {/* Navigation cards */}
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Link
-            to="/grade/5"
-            className="rounded-xl border bg-white p-6 hover:border-indigo-300 hover:shadow-sm transition-all block"
-          >
-            <div className="mb-3 text-2xl">📚</div>
-            <h3 className="font-semibold text-gray-900">Lecții</h3>
-            <p className="mt-1 text-sm text-gray-500">Clasa a V-a — Matematică</p>
-          </Link>
-          <Link to="/exercises" className="rounded-xl border bg-white p-6 hover:border-indigo-300 hover:shadow-sm transition-all block">
-  <div className="mb-3 text-2xl">✏️</div>
-  <h3 className="font-semibold text-gray-900">Exerciții</h3>
-  <p className="mt-1 text-sm text-gray-500">Toate exercițiile tale</p>
-</Link>
-          <div className="flex flex-col">
-            <Link to="/tests" className="rounded-xl border bg-white p-6 hover:border-indigo-300 hover:shadow-sm transition-all block">
-              <div className="mb-3 text-2xl">🏆</div>
-              <h3 className="font-semibold text-gray-900">Teste</h3>
-              <p className="mt-1 text-sm text-gray-500">Evaluările lecțiilor</p>
-            </Link>
-            {user.user_type === "student" && (
-              <Link
-                to="/test-history"
-                className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline self-end"
-              >
-                Vezi istoricul →
-              </Link>
-            )}
-          </div>
-        </div>
 
         {/* Per-unit progress — only show if we have data and user is student */}
         {user.user_type === "student" && stats && stats.units.length > 0 && (
@@ -429,40 +416,6 @@ function WeakCategoryCard({ cat }: { cat: WeakCategory }) {
       >
         Exersează
       </Link>
-    </div>
-  );
-}
-
-function StatCard({
-  loading,
-  icon,
-  label,
-  value,
-  sub,
-}: {
-  loading: boolean;
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-xl border bg-white p-5">
-      <div className="flex items-center gap-2 mb-3">
-        {icon}
-        <span className="text-sm text-gray-500">{label}</span>
-      </div>
-      {loading ? (
-        <div className="animate-pulse">
-          <div className="h-7 bg-gray-200 rounded w-20 mb-1" />
-          <div className="h-4 bg-gray-100 rounded w-28" />
-        </div>
-      ) : (
-        <>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-        </>
-      )}
     </div>
   );
 }

@@ -31,6 +31,7 @@ import type {
   TestStartResponse,
 } from "@/types/test";
 import TestExerciseCard, { DifficultyBadge } from "@/components/exercise/TestExerciseCard";
+import HomeBrand from "@/components/HomeBrand";
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -184,6 +185,7 @@ export default function TestPage() {
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
           <button
             onClick={() => navigate(backTarget)}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
@@ -317,6 +319,12 @@ function TestResultScreen({ result, exercises, onRetry, backTo = "/tests" }: Tes
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
+          <span className="text-sm font-medium text-gray-700">Rezultate test</span>
+        </div>
+      </div>
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Score card */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center mb-6">

@@ -119,6 +119,10 @@ export interface CategoryInfo {
   exercise_count: number;
   exercises_attempted: number;
   perfect_batches: number;
+  easy_cleared: boolean;
+  medium_cleared: boolean;
+  hard_cleared: boolean;
+  all_tiers_cleared: boolean;
   tiers: CategoryTiers;
 }
 
@@ -126,6 +130,11 @@ export interface TopicCategoriesResponse {
   topic_id: number;
   topic_title: string;
   categories: CategoryInfo[];
+  total_categories: number;
+  easy_clear_count: number;
+  medium_clear_count: number;
+  hard_clear_count: number;
+  is_perfect: boolean;
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -174,6 +183,10 @@ export interface TopicExerciseSummary {
   topic_order: number;
   total_categories: number;
   completed_categories: number;
+  easy_clear_count: number;
+  medium_clear_count: number;
+  hard_clear_count: number;
+  is_perfect: boolean;
   exercises_attempted: number;
 }
 
@@ -223,5 +236,6 @@ export interface StreakData {
   current_streak: number;
   longest_streak: number;
   freeze_count: number;
-  active_dates: string[];  // ISO date strings "YYYY-MM-DD"
+  // ISO date "YYYY-MM-DD" → exercise-attempt count (≥1 for any active day).
+  daily_counts: Record<string, number>;
 }

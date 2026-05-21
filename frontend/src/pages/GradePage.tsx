@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import api from "@/api/client";
+import HomeBrand from "@/components/HomeBrand";
 import type {
   GradeDetail,
   LessonListItem,
@@ -76,13 +77,16 @@ export default function GradePage() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 py-6">
-          <Link
-            to="/dashboard"
-            className="flex items-center gap-1 text-gray-400 hover:text-gray-600 text-sm mb-3 transition-colors w-fit"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Dashboard</span>
-          </Link>
+          <div className="flex items-center gap-3 mb-3">
+            <HomeBrand />
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-1 text-gray-400 hover:text-gray-600 text-sm transition-colors w-fit"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Dashboard</span>
+            </Link>
+          </div>
           <h1 className="text-2xl font-bold text-gray-900">{grade.name}</h1>
         </div>
       </div>

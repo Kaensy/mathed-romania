@@ -41,7 +41,10 @@ class StreakSerializer(serializers.Serializer):
     current_streak = serializers.IntegerField()
     longest_streak = serializers.IntegerField()
     freeze_count = serializers.IntegerField()
-    active_dates = serializers.ListField(
-        child=serializers.DateField(),
-        help_text="Dates the student was active, for calendar heatmap",
+    daily_counts = serializers.DictField(
+        child=serializers.IntegerField(),
+        help_text=(
+            "{ISO-date: attempt_count} for the heatmap. "
+            "Lesson-only / test-only active days are present at count=1."
+        ),
     )

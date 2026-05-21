@@ -33,15 +33,9 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
 
-function tokenize(text: string): string[] {
-  return normalize(text)
-    .split(/[^\p{L}\d]+/u)
-    .filter(Boolean);
-}
-
 function fieldMatches(field: string, normalizedQuery: string): boolean {
   if (!normalizedQuery) return false;
-  return tokenize(field).some((tok) => tok.startsWith(normalizedQuery));
+  return normalize(field).includes(normalizedQuery);
 }
 
 export default function GlossaryDrawer() {

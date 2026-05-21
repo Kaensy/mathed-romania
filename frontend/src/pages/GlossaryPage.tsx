@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import api from "@/api/client";
 import { InlineMath } from "@/lib/math";
+import HomeBrand from "@/components/HomeBrand";
 import type {
   GlossaryCategory,
   GlossaryTerm,
@@ -34,15 +35,9 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
 
-function tokenize(text: string): string[] {
-  return normalize(text)
-    .split(/[^\p{L}\d]+/u)
-    .filter(Boolean);
-}
-
 function fieldMatches(field: string, normalizedQuery: string): boolean {
   if (!normalizedQuery) return false;
-  return tokenize(field).some((tok) => tok.startsWith(normalizedQuery));
+  return normalize(field).includes(normalizedQuery);
 }
 
 function unitChipLabel(unit: GlossaryUnit): string {
@@ -165,9 +160,12 @@ export default function GlossaryPage() {
       ) : (
         <header className="border-b bg-white">
           <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-            <Link to="/dashboard" className="text-sm text-gray-500 hover:text-indigo-600">
-              ← Dashboard
-            </Link>
+            <div className="flex items-center gap-3">
+              <HomeBrand />
+              <Link to="/dashboard" className="text-sm text-gray-500 hover:text-indigo-600">
+                ← Dashboard
+              </Link>
+            </div>
             <h1 className="text-lg font-bold text-indigo-900">Glosar</h1>
             <span className="w-20" aria-hidden />
           </div>

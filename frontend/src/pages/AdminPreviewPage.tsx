@@ -12,6 +12,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { RotateCcw, ArrowLeft, FlaskConical } from "lucide-react";
 import api from "@/api/client";
 import ExerciseCard from "@/components/exercise/ExerciseCard";
+import HomeBrand from "@/components/HomeBrand";
 import type { ExerciseInstance } from "@/types/progress";
 
   interface PreviewResponse {
@@ -121,6 +122,7 @@ export default function AdminPreviewPage() {
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+          <HomeBrand />
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"

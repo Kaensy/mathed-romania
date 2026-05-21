@@ -102,8 +102,8 @@ export default function PetPanel() {
                 />
               </div>
               <p className="mt-1 text-xs text-slate-400">
-                {pet.xp_to_next_level} XP până la nivel {pet.level + 1} · XP total:{" "}
-                {pet.total_xp.toLocaleString("ro-RO")}
+                {pet.xp_to_next_level} XP până la nivel {pet.level + 1} · XP pet:{" "}
+                {pet.pet_xp.toLocaleString("ro-RO")}
               </p>
             </div>
           </div>

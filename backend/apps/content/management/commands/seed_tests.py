@@ -7,7 +7,9 @@ Compositions are derived from the active exercises actually present on
 each topic — easy + medium only (hard is reserved for top students).
 
 Idempotent: get_or_create on (scope, topic) / (scope, unit).
-Existing tests are left untouched.
+On existing Tests, composition is recomputed and updated if it differs
+from the current value. Other fields (pass_threshold, time_limit_minutes,
+is_published) stay frozen on existing rows.
 """
 from collections import defaultdict
 
@@ -107,7 +109,8 @@ class Command(BaseCommand):
         ))
 
         created_topic_tests = 0
-        existing_topic_tests = 0
+        updated_topic_tests = 0
+        unchanged_topic_tests = 0
         empty_compositions = 0
 
         for topic in topics:
@@ -115,7 +118,7 @@ class Command(BaseCommand):
             if not composition:
                 empty_compositions += 1
 
-            _, created = Test.objects.get_or_create(
+            test, created = Test.objects.get_or_create(
                 topic=topic,
                 defaults={
                     "scope": Test.Scope.TOPIC,
@@ -132,15 +135,23 @@ class Command(BaseCommand):
                     f"  + created topic test for T{topic.order} — {topic.title} "
                     f"({len(composition)} slot(s))"
                 ))
+            elif test.composition != composition:
+                test.composition = composition
+                test.save(update_fields=["composition"])
+                updated_topic_tests += 1
+                self.stdout.write(self.style.WARNING(
+                    f"  ~ updated topic test for T{topic.order} — {topic.title} "
+                    f"({len(composition)} slot(s))"
+                ))
             else:
-                existing_topic_tests += 1
+                unchanged_topic_tests += 1
                 self.stdout.write(
-                    f"  · topic test already exists for T{topic.order} — {topic.title}"
+                    f"  · topic test unchanged for T{topic.order} — {topic.title}"
                 )
 
         # Unit test
         unit_composition = _build_unit_composition(unit)
-        _, unit_created = Test.objects.get_or_create(
+        unit_test, unit_created = Test.objects.get_or_create(
             unit=unit,
             defaults={
                 "scope": Test.Scope.UNIT,
@@ -152,18 +163,26 @@ class Command(BaseCommand):
         )
 
         if unit_created:
+            unit_status = "created"
             self.stdout.write(self.style.SUCCESS(
                 f"  + created unit test ({len(unit_composition)} slot(s), "
                 f"{UNIT_TEST_TIME_LIMIT_MIN} min)"
             ))
+        elif unit_test.composition != unit_composition:
+            unit_test.composition = unit_composition
+            unit_test.save(update_fields=["composition"])
+            unit_status = "updated"
+            self.stdout.write(self.style.WARNING(
+                f"  ~ updated unit test ({len(unit_composition)} slot(s))"
+            ))
         else:
-            self.stdout.write(f"  · unit test already exists for {unit.title}")
+            unit_status = "unchanged"
+            self.stdout.write(f"  · unit test unchanged for {unit.title}")
 
         self.stdout.write("")
         self.stdout.write(self.style.NOTICE("Summary:"))
         self.stdout.write(f"  Topic tests created: {created_topic_tests}")
-        self.stdout.write(f"  Topic tests already present: {existing_topic_tests}")
+        self.stdout.write(f"  Topic tests updated: {updated_topic_tests}")
+        self.stdout.write(f"  Topic tests unchanged: {unchanged_topic_tests}")
         self.stdout.write(f"  Topic tests with empty composition: {empty_compositions}")
-        self.stdout.write(
-            f"  Unit test: {'created' if unit_created else 'already present'}"
-        )
+        self.stdout.write(f"  Unit test: {unit_status}")

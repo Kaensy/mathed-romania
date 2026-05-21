@@ -3,9 +3,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Lock, Star } from "lucide-react";
+import { ArrowLeft, Crown, Lock, Star } from "lucide-react";
 import api from "@/api/client";
-import { CATEGORY_LABELS } from "@/constants/categoryLabels";
+import HomeBrand from "@/components/HomeBrand";
 import type { TopicCategoriesResponse, CategoryInfo, Difficulty } from "@/types/progress";
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
@@ -62,6 +62,7 @@ export default function ExerciseHubPage() {
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
           <button
             onClick={() => navigate(backTo)}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
@@ -75,7 +76,10 @@ export default function ExerciseHubPage() {
       </div>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-xl font-bold text-gray-900 mb-6">{data.topic_title}</h1>
+        <div className="flex items-center gap-3 mb-6 flex-wrap">
+          <h1 className="text-xl font-bold text-gray-900">{data.topic_title}</h1>
+          {data.is_perfect && <PerfectBadge />}
+        </div>
 
         {data.categories.length === 0 && (
           <p className="text-gray-400 text-center py-12">Nicio categorie disponibilă.</p>
@@ -106,7 +110,7 @@ function CategoryCard({
   origin: string;
 }) {
   const navigate = useNavigate();
-  const label = CATEGORY_LABELS[category.category] ?? category.category;
+  const label = category.label || category.category;
 
   const startPractice = (difficulty: Difficulty) => {
     navigate(`/topic/${topicId}/practice`, {
@@ -115,8 +119,14 @@ function CategoryCard({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <div className="flex items-center justify-between mb-4">
+    <div className="relative bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      {category.all_tiers_cleared && (
+        <Crown
+          className="absolute top-3 right-3 w-5 h-5 text-amber-500 fill-amber-400 drop-shadow-[0_1px_2px_rgba(245,158,11,0.4)]"
+          aria-label="Toate nivelurile completate"
+        />
+      )}
+      <div className="flex items-center justify-between mb-4 pr-7">
         <h3 className="font-semibold text-gray-900">{label}</h3>
         <div className="text-xs text-gray-400">
           {category.exercises_attempted} încercări · {category.perfect_batches} perfecte
@@ -152,5 +162,19 @@ function CategoryCard({
         })}
       </div>
     </div>
+  );
+}
+
+function PerfectBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide
+                 bg-gradient-to-r from-amber-200 via-amber-300 to-amber-200 text-amber-900
+                 ring-2 ring-amber-300/70 shadow-sm"
+      aria-label="Subiect perfect — toate categoriile la toate nivelurile"
+    >
+      <Crown className="w-3.5 h-3.5 fill-amber-500 text-amber-700" />
+      Perfect
+    </span>
   );
 }

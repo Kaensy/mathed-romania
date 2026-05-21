@@ -16,6 +16,7 @@ import {
   Clock,
 } from "lucide-react";
 import api from "@/api/client";
+import HomeBrand from "@/components/HomeBrand";
 import type { TestHistoryAttempt, TestHistoryResponse } from "@/types/test";
 
 export default function TestHistoryPage() {
@@ -34,6 +35,7 @@ export default function TestHistoryPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-10 border-b bg-white">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4">
+          <HomeBrand />
           <button
             onClick={() => navigate("/dashboard")}
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"

@@ -37,3 +37,15 @@ def xp_to_next_level(current_xp: int) -> int:
     """XP gap from `current_xp` up to the threshold for the next level."""
     next_level = level_for_xp(current_xp) + 1
     return _threshold_for_level(next_level) - max(current_xp, 0)
+
+
+def xp_into_level(current_xp: int) -> int:
+    """XP already accrued within the current level (offset above its threshold)."""
+    level = level_for_xp(current_xp)
+    return max(current_xp, 0) - _threshold_for_level(level)
+
+
+def xp_for_next_level(current_xp: int) -> int:
+    """Total XP needed to traverse the current level (band width)."""
+    level = level_for_xp(current_xp)
+    return _threshold_for_level(level + 1) - _threshold_for_level(level)

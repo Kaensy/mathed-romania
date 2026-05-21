@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ArrowLeft, PenLine, ClipboardList, Lock } from "lucide-react";
 import { BlockRenderer } from "./Blocks";
+import HomeBrand from "@/components/HomeBrand";
 import type { LessonDetail } from "@/types/lesson";
 import api from "@/api/client";
 
@@ -58,6 +59,7 @@ export default function LessonViewer() {
       {/* Top navigation bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
           <Link
             to={`/grade/${lesson.grade_number}`}
             className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors text-sm"

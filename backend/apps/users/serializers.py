@@ -12,6 +12,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from apps.pets.levels import (
+    level_for_xp,
+    xp_for_next_level,
+    xp_into_level,
+    xp_to_next_level,
+)
+
 from .models import StudentProfile, TeacherProfile
 
 User = get_user_model()
@@ -167,9 +174,36 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class StudentProfileSerializer(serializers.ModelSerializer):
+    total_xp = serializers.IntegerField(read_only=True)
+    account_level = serializers.SerializerMethodField()
+    xp_into_level = serializers.SerializerMethodField()
+    xp_for_next_level = serializers.SerializerMethodField()
+    xp_to_next_level = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentProfile
-        fields = ["grade", "birth_date", "consent_status"]
+        fields = [
+            "grade",
+            "birth_date",
+            "consent_status",
+            "total_xp",
+            "account_level",
+            "xp_into_level",
+            "xp_for_next_level",
+            "xp_to_next_level",
+        ]
+
+    def get_account_level(self, obj) -> int:
+        return level_for_xp(obj.total_xp)
+
+    def get_xp_into_level(self, obj) -> int:
+        return xp_into_level(obj.total_xp)
+
+    def get_xp_for_next_level(self, obj) -> int:
+        return xp_for_next_level(obj.total_xp)
+
+    def get_xp_to_next_level(self, obj) -> int:
+        return xp_to_next_level(obj.total_xp)
 
 
 class TeacherProfileSerializer(serializers.ModelSerializer):

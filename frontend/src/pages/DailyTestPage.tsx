@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import api from "@/api/client";
 import TestExerciseCard from "@/components/exercise/TestExerciseCard";
+import HomeBrand from "@/components/HomeBrand";
 import type {
   DailyAnswerValue,
   DailyExercise,
@@ -353,6 +354,12 @@ function CompletedState({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
+          <span className="text-sm font-medium text-gray-700">Testul zilei</span>
+        </div>
+      </div>
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
           <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -423,7 +430,14 @@ function AvailableState({
 }) {
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
+          <span className="text-sm font-medium text-gray-700">Testul zilei</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center max-w-md w-full">
         <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4">
           <Flame className="w-10 h-10 text-orange-500" />
@@ -453,6 +467,7 @@ function AvailableState({
           Înapoi la pagina principală
         </button>
       </div>
+      </div>
     </div>
   );
 }
@@ -461,7 +476,14 @@ function AvailableState({
 
 function NoExercisesState({ message }: { message: string }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <HomeBrand />
+          <span className="text-sm font-medium text-gray-700">Testul zilei</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center max-w-md w-full">
         <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-4">
           <Flame className="w-10 h-10 text-indigo-500" />
@@ -487,6 +509,7 @@ function NoExercisesState({ message }: { message: string }) {
           </Link>
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -506,6 +529,7 @@ function TopBar({
   return (
     <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+        <HomeBrand />
         <button
           onClick={onBack}
           className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm transition-colors"
