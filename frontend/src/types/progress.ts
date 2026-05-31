@@ -26,8 +26,19 @@ export interface ExerciseInstance {
   exercise_type: ExerciseType;
   difficulty: Difficulty;
   instance_token: string;
-  display_mode?: "digit_click" | "drag_symbol" | "drag_number" | "inline_between" | string;
+  display_mode?:
+    | "digit_click"
+    | "drag_symbol"
+    | "drag_number"
+    | "inline_between"
+    | "follow_up"
+    | "column_arithmetic"
+    | string;
   number_string?: string;
+
+  // column_arithmetic display mode
+  operands?: number[];
+  operation?: "addition" | "subtraction" | "multiplication";
 
   // Common
   question: string;

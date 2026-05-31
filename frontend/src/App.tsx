@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { GlossaryDrawerProvider } from "@/contexts/GlossaryDrawerContext";
+import { CiornaProvider } from "@/contexts/CiornaContext";
 import { BadgeNotificationProvider } from "@/contexts/BadgeNotificationContext";
 import { CosmeticNotificationProvider } from "@/contexts/CosmeticNotificationContext";
 import { CosmeticsProvider } from "@/contexts/CosmeticsContext";
@@ -10,6 +11,8 @@ import { BonusCelebrationProvider } from "@/contexts/BonusCelebrationContext";
 import { XPNotificationProvider } from "@/contexts/XPNotificationContext";
 import GlossaryDrawer from "@/components/GlossaryDrawer";
 import GlossaryFab from "@/components/GlossaryFab";
+import CiornaFab from "@/components/ciorna/CiornaFab";
+import CiornaContainer from "@/components/ciorna/CiornaContainer";
 import BadgeToast from "@/components/badges/BadgeToast";
 import CosmeticToast from "@/components/cosmetics/CosmeticToast";
 import XPToast from "@/components/pets/XPToast";
@@ -108,13 +111,17 @@ export default function App() {
                 <BonusCelebrationProvider>
                   <GlossaryProvider>
                     <GlossaryDrawerProvider>
-                      <AppRoutes />
-                      <GlossaryFab />
-                      <GlossaryDrawer />
-                      <BadgeToast />
-                      <CosmeticToast />
-                      <XPToast />
-                      <BonusCelebration />
+                      <CiornaProvider>
+                        <AppRoutes />
+                        <GlossaryFab />
+                        <GlossaryDrawer />
+                        <CiornaFab />
+                        <CiornaContainer />
+                        <BadgeToast />
+                        <CosmeticToast />
+                        <XPToast />
+                        <BonusCelebration />
+                      </CiornaProvider>
                     </GlossaryDrawerProvider>
                   </GlossaryProvider>
                 </BonusCelebrationProvider>

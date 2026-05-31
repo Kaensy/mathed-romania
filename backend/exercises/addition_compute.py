@@ -46,15 +46,20 @@ EXERCISES = [
         "template": {
             "title": "Adunare: două numere de 3 cifre",
             "type": "fill_blank",
-            "question": "Calculați:  ${a} + {b}$",
+            "question": "Calculați adunarea în coloană:",
             "params": {
                 "a": {"type": "randint", "min": 100, "max": 999},
                 "b": {"type": "randint", "min": 100, "max": 999},
             },
             "answer_expr": "{a} + {b}",
             "answer_input": "number",
-            "hint": "Adunați cele două numere.",
+            "hint": "Adunați cifrele coloană cu coloană, începând de la unități.",
             "placeholder": "= ?",
+            # Column-arithmetic display: student fills the result row of a
+            # notebook-style grid; the assembled number is graded by answer_expr.
+            "display_mode": "column_arithmetic",
+            "column_operands": ["a", "b"],
+            "column_operation": "addition",
         },
     },
     {

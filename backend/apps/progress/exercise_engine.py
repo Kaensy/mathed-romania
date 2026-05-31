@@ -241,6 +241,15 @@ def _build_fill_blank(template: dict, params: dict) -> tuple[dict, dict]:
         "placeholder": template.get("placeholder", "Răspuns..."),
     }
 
+    # ── Column-arithmetic display mode: resolve operand values + operation ──
+    # The student answers by filling the result row of a notebook-style grid.
+    # The frontend renders ColumnArithmetic with mode="input"; grading is the
+    # same answer_expr path as a normal fill_blank.
+    if template.get("display_mode") == "column_arithmetic":
+        operand_names = template.get("column_operands", [])
+        frontend["operands"] = [int(params[name]) for name in operand_names]
+        frontend["operation"] = template.get("column_operation", "addition")
+
     # ── Set-membership grading ────────────────────────────────────────────
     if "valid_set_expr" in template:
         expr = _fill(template["valid_set_expr"], params)

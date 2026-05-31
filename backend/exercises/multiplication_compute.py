@@ -40,15 +40,20 @@ EXERCISES = [
         "template": {
             "title": "Înmulțire: două numere de 2 cifre",
             "type": "fill_blank",
-            "question": "Calculați:  ${a} \\cdot {b}$",
+            "question": "Calculați înmulțirea în coloană:",
             "params": {
                 "a": {"type": "randint", "min": 11, "max": 99},
                 "b": {"type": "randint", "min": 11, "max": 99},
             },
             "answer_expr": "{a} * {b}",
             "answer_input": "number",
-            "hint": "Înmulțiți cele două numere.",
+            "hint": "Înmulțiți pe rând fiecare cifră a celui de-al doilea număr cu primul, apoi adunați produsele parțiale.",
             "placeholder": "= ?",
+            # Column-arithmetic display: student fills the result row of a
+            # notebook-style grid; the assembled number is graded by answer_expr.
+            "display_mode": "column_arithmetic",
+            "column_operands": ["a", "b"],
+            "column_operation": "multiplication",
         },
     },
     {

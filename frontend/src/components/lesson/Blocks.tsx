@@ -7,6 +7,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, Lightbulb, AlertTriangle, Globe, BookOpen, Cpu } from "lucide-react";
 import { BlockMath } from "@/lib/math";
 import AutoLinkText from "@/components/AutoLinkText";
+import ColumnArithmetic from "@/components/lesson/interactive/ColumnArithmetic";
 import type {
   ParagraphBlock,
   DefinitionBox,
@@ -565,6 +566,9 @@ export function BlockRenderer({ block }: { block: LessonBlock }) {
     case "collapsible":
       return <CollapsibleSectionComponent block={block} />;
     case "interactive":
+      if (block.component === "column_arithmetic") {
+        return <ColumnArithmetic config={block.config} />;
+      }
       return <InteractiveComponentPlaceholder block={block} />;
     case "merged_table":
       return <MergedTableComponent block={block as any} />;

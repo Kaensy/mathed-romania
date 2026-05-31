@@ -55,7 +55,8 @@
         145,
         67
       ],
-      "operation": "addition"
+      "operation": "addition",
+      "editable": true
     },
     "component": "column_arithmetic"
   },

@@ -33,15 +33,20 @@ EXERCISES = [
         "template": {
             "title": "Scădere: două numere de 3 cifre",
             "type": "fill_blank",
-            "question": "Calculați:  ${a} - {b}$",
+            "question": "Calculați scăderea în coloană:",
             "params": {
                 "b": {"type": "randint", "min": 100, "max": 499},
                 "a": {"type": "randint", "min": 500, "max": 999},
             },
             "answer_expr": "{a} - {b}",
             "answer_input": "number",
-            "hint": "Scădeți cele două numere.",
+            "hint": "Scădeți cifrele coloană cu coloană, începând de la unități. Împrumutați câte 1 când e nevoie.",
             "placeholder": "= ?",
+            # Column-arithmetic display: student fills the result row of a
+            # notebook-style grid; the assembled number is graded by answer_expr.
+            "display_mode": "column_arithmetic",
+            "column_operands": ["a", "b"],
+            "column_operation": "subtraction",
         },
     },
     {

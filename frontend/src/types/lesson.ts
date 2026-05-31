@@ -119,6 +119,19 @@ export interface InteractiveComponent {
   config: Record<string, unknown>;
 }
 
+// ─── Column arithmetic ────────────────────────────────────────────────────────
+
+export type ColumnArithmeticOperation = "addition" | "subtraction" | "multiplication";
+export type ColumnArithmeticMode = "display" | "input" | "scratch";
+
+export interface ColumnArithmeticConfig {
+  operation: ColumnArithmeticOperation;
+  operands: number[];
+  mode?: ColumnArithmeticMode;
+  /** When true, the student can edit the operands and watch the method recompute. */
+  editable?: boolean;
+}
+
 export type LessonBlock =
   | ParagraphBlock
   | DefinitionBox

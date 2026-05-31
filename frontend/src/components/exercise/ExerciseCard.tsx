@@ -13,6 +13,7 @@ import { CheckCircle, XCircle, ChevronRight, Trophy } from "lucide-react";
 import api from "@/api/client";
 import { InlineMath } from "@/lib/math";
 import AutoLinkText from "@/components/AutoLinkText";
+import ColumnArithmetic from "@/components/lesson/interactive/ColumnArithmetic";
 import type { AttemptResult, ExerciseInstance, TierCleared } from "@/types/progress";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -284,15 +285,31 @@ export default function ExerciseCard({
             />
 
           ) : exercise.exercise_type === "fill_blank" ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={answer as string}
-              onChange={(e) => setAnswer(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={exercise.placeholder ?? "Răspunsul tău…"}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-lg"
-            />
+            exercise.display_mode === "column_arithmetic" &&
+            exercise.operands &&
+            exercise.operation ? (
+              <ColumnArithmetic
+                // Remount on exercise change so the result-row digit array
+                // and cursor reset to a fresh state for the new operands.
+                key={exercise.instance_token}
+                config={{
+                  operands: exercise.operands,
+                  operation: exercise.operation,
+                  mode: "input",
+                }}
+                onResultChange={(r) => setAnswer(r)}
+              />
+            ) : (
+              <input
+                ref={inputRef}
+                type="text"
+                value={answer as string}
+                onChange={(e) => setAnswer(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={exercise.placeholder ?? "Răspunsul tău…"}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none text-lg"
+              />
+            )
 
           ) : exercise.exercise_type === "comparison" && exercise.left && exercise.right ? (
             exercise.display_mode === "drag_symbol" ? (
