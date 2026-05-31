@@ -1335,10 +1335,11 @@ function ArithmeticInputView({
 // ─── Scratch view (mode="scratch") — ciornă draft surface ────────────────────
 //
 // Every column is one 32px paper cell so the card tiles the notebook grid 1:1.
-// Operand + partial rows are editable: each digit cell overtypes in place, a
-// neutral prepend slot grows the number leftward, and a transient append caret
-// (units side, shown only while the row is focused) grows it rightward — so at
-// rest the operator hugs the operand with no idle gap. The result row uses the
+// Operand + partial rows are editable: each digit cell overtypes in place, and
+// two transient affordances — a neutral prepend slot (left) and an append caret
+// (units side) — appear only while the row is focused to grow the number, so at
+// rest the operand shows only its digits with the operator flush against the
+// units. The result row uses the
 // solving-mode model: each cell independent, cursor starts at units, typing
 // moves the cursor LEFT, Backspace moves it RIGHT. The single operator sign
 // sits at operand row 1's top-right (the cycling button). All cells are
@@ -1865,12 +1866,13 @@ function ArithmeticScratchView({
 // One row of the scratch grid that holds a single numeric value, optionally
 // shifted left by N grid columns. Every column is exactly one 32px paper cell.
 // The value is an EDITABLE field: each digit cell overtypes in place (click +
-// type to replace, Backspace trims), and two extend affordances grow it:
+// type to replace, Backspace trims), and two extend affordances grow it. Both
+// are TRANSIENT — revealed only while the row is focused (the append caret also
+// shows on an empty row, for first-digit entry) — so at rest the operand shows
+// only its digits with the operator flush against the units:
 //   - prepend slot (left of the MSB) — a neutral "·" cell, NOT a "+", so it
 //     never reads as a stray operator;
-//   - append caret (units side) — TRANSIENT: rendered only while the row is
-//     focused (or empty, for first-digit entry), so at rest the operator hugs
-//     the operand directly with no idle gap.
+//   - append caret (units side).
 // All cells are <input>/<button>, so the card never drags from this row — only
 // the surrounding chrome (spacers, separator, area beneath the operator) does.
 // The operator-sign column renders ONLY on the sign row (exactly one operator,
@@ -1923,10 +1925,11 @@ function EditableDigitRow({
   const k = value == null ? 0 : lenOf(value);
   const filledMinGridLsb = shift;
   const filledMaxGridLsb = shift + k - 1;
-  // Prepend slot sits one grid column LEFT of the current MSB, when the row has
-  // at least one digit and there's room (the empty state uses the append caret
-  // for first-digit entry).
-  const prependGridLsb = k > 0 && shift + k < gridWidth ? shift + k : -1;
+  // Prepend slot sits one grid column LEFT of the current MSB. Like the append
+  // caret it is transient — only revealed while the row is focused (and it has
+  // a digit with room to grow) — so at rest the operand shows only its digits.
+  const prependGridLsb =
+    rowFocused && k > 0 && shift + k < gridWidth ? shift + k : -1;
   const growKey = `${rowType}-${rowIdx}-grow`;
   // The append caret is transient: shown only while the row is being edited, so
   // at rest the operator hugs the operand. An empty row always shows it (the
