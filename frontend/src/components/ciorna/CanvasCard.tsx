@@ -1,17 +1,16 @@
 /**
  * CanvasCard — minimal-chrome frame around a placed ciornă component.
  *
- * Phase 3b refactor: the persistent title bar is gone. The card's only
- * resting chrome is its 2-px amber outline, which doubles as the drag
- * handle:
+ * The card has NO padding ring: its 2-px amber outline (border-box) sits
+ * directly on the cell gridlines so the placed component fuses to the paper.
+ * The outline doubles as the drag handle:
  *
- *   - The card root has 8 px of padding so the outline + the invisible
- *     ring inside it form an ~10 px hit zone for the drag. Hovering this
- *     zone shows the move cursor; pointerdown starts the drag.
- *   - Children fill the inner content area; their own pointer events go
- *     through untouched (cells stay clickable, inputs stay editable). The
- *     `target === currentTarget` guard on the root pointerdown ensures
- *     only clicks that land on the padding/border start the drag.
+ *   - pointerdown on the 2-px border (where `target === currentTarget`)
+ *     starts a drag. Children fill the content box; their own pointer events
+ *     go through untouched (cells stay clickable, inputs stay editable).
+ *   - During the drag the card tracks the cursor 1:1 at any zoom (delta is
+ *     divided by `scale` to convert screen px → canvas px). On drop the
+ *     origin snaps to the nearest whole cell.
  *
  * The X close button sits at the top-right corner, invisible at rest and
  * fading in on hover or when the card holds focus (group-hover +
@@ -21,13 +20,19 @@
  * Keyboard:
  *  - tabIndex=0 on the root. Delete + arrow nudges fire only when the
  *    event target IS the root, so internal cell editing keeps its keys.
+ *    Arrows step one whole cell (Shift = 5 cells); the origin stays
+ *    grid-aligned because placement + drop both snap to the grid.
  */
 import { useCallback, type ReactNode } from "react";
 import { X } from "lucide-react";
 
-const NUDGE_STEP = 8;
-const NUDGE_STEP_LARGE = 32;
-const HIT_ZONE_PX = 8;
+// Paper cell size — must match GRID_PX in CanvasSurface so snapping lands on
+// the same grid the cards are positioned against.
+const GRID_PX = 32;
+const NUDGE_STEP = GRID_PX;          // one cell
+const NUDGE_STEP_LARGE = GRID_PX * 5; // power-user jump, still grid-aligned
+
+const snapToGrid = (v: number) => Math.round(v / GRID_PX) * GRID_PX;
 
 interface Props {
   id: string;
@@ -61,10 +66,16 @@ export default function CanvasCard({
       const target = e.currentTarget;
       target.setPointerCapture(e.pointerId);
 
+      // Track the latest free (un-snapped) position so the drag follows the
+      // cursor 1:1; we snap to the nearest cell only on drop.
+      let lastX = startX;
+      let lastY = startY;
       const move = (ev: PointerEvent) => {
         const dx = (ev.clientX - startClientX) / scale;
         const dy = (ev.clientY - startClientY) / scale;
-        onMove(id, startX + dx, startY + dy);
+        lastX = startX + dx;
+        lastY = startY + dy;
+        onMove(id, lastX, lastY);
       };
       const end = (ev: PointerEvent) => {
         target.removeEventListener("pointermove", move);
@@ -75,6 +86,8 @@ export default function CanvasCard({
         } catch {
           // already released; ignore
         }
+        // Snap the origin to the nearest whole cell.
+        onMove(id, snapToGrid(lastX), snapToGrid(lastY));
       };
       target.addEventListener("pointermove", move);
       target.addEventListener("pointerup", end);
@@ -84,8 +97,8 @@ export default function CanvasCard({
   );
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Only the outline / padding ring starts a drag — descendants (inputs,
-    // close button, cells) keep their own pointer behavior.
+    // Only the 2-px outline starts a drag — descendants (inputs, close
+    // button, cells) keep their own pointer behavior.
     if (e.target !== e.currentTarget) return;
     startDrag(e);
   };
@@ -128,7 +141,7 @@ export default function CanvasCard({
       data-card-id={id}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
-      className="group absolute cursor-move rounded-xl border-2 border-amber-300
+      className="group absolute box-border cursor-move border-2 border-amber-300
         transition-[border-color,box-shadow]
         hover:border-amber-400
         focus-within:border-amber-500 focus-within:shadow-[0_2px_10px_-2px_rgba(180,83,9,0.25)]
@@ -136,7 +149,6 @@ export default function CanvasCard({
       style={{
         left: x,
         top: y,
-        padding: HIT_ZONE_PX,
         touchAction: "none",
       }}
     >

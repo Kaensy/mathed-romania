@@ -1669,7 +1669,10 @@ function ArithmeticScratchView({
   return (
     <div className="my-2">
       <div className="overflow-x-auto">
-        <div className="inline-block rounded-md border border-blue-200 bg-blue-50/40 shadow-sm font-mono select-none">
+        {/* No border / rounding / bg here: the scratch grid sits directly on
+            the ciornă paper so its 32px cells tile the notebook grid 1:1 and
+            the enclosing CanvasCard's amber outline is the only frame. */}
+        <div className="inline-block font-mono select-none">
           {operands.map((opVal, rowIdx) => (
             <EditableDigitRow
               key={`op-${rowIdx}`}
@@ -1744,6 +1747,7 @@ function ArithmeticScratchView({
               return (
                 <DigitCell
                   key={i}
+                  size="grid"
                   variant="editable"
                   emphasis="bold"
                   digit={resultDigits[lsbPos] ?? null}
@@ -1758,8 +1762,8 @@ function ArithmeticScratchView({
                 />
               );
             })}
-            <div className="w-3 h-9 border-l border-blue-200" aria-hidden />
-            <div className="w-8 h-9 border-l border-blue-200" />
+            <div className="w-3 h-8 border-l border-blue-200" aria-hidden />
+            <div className="w-8 h-8 border-l border-blue-200" />
           </div>
         </div>
       </div>
@@ -1864,6 +1868,7 @@ function EditableDigitRow({
             return (
               <DigitCell
                 key={i}
+                size="grid"
                 variant="editable"
                 digit={d}
                 borderLeft={i !== 0}
@@ -1907,7 +1912,7 @@ function EditableDigitRow({
                   }
                 }}
                 className={
-                  "w-8 h-9 p-0 m-0 text-center font-mono text-lg leading-9 " +
+                  "w-8 h-8 p-0 m-0 text-center font-mono text-lg leading-8 " +
                   "bg-indigo-50/50 text-indigo-700 placeholder:text-indigo-300 " +
                   "transition-colors focus:bg-indigo-100/70 focus:outline-none " +
                   "focus:ring-1 focus:ring-indigo-400 focus:ring-inset caret-indigo-500 " +
@@ -1920,7 +1925,7 @@ function EditableDigitRow({
           return (
             <div
               key={i}
-              className={"w-8 h-9 " + (i !== 0 ? "border-l border-blue-200" : "")}
+              className={"w-8 h-8 " + (i !== 0 ? "border-l border-blue-200" : "")}
             />
           );
         })}
@@ -1948,7 +1953,7 @@ function EditableDigitRow({
               handlers.deleteAt(rowIdx, shift);
             }
           }}
-          className="w-3 h-9 p-0 m-0 bg-transparent text-center font-mono text-lg leading-9 text-gray-900 border-l border-blue-200 transition-colors focus:bg-blue-100/70 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-inset caret-blue-500"
+          className="w-3 h-8 p-0 m-0 bg-transparent text-center font-mono text-lg leading-8 text-gray-900 border-l border-blue-200 transition-colors focus:bg-blue-100/70 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-inset caret-blue-500"
         />
       </div>
 
@@ -1959,7 +1964,7 @@ function EditableDigitRow({
           onClick={onSignClick}
           aria-label="Schimbă operația"
           title="Schimbă operația"
-          className="w-8 h-9 flex items-center justify-center text-lg text-gray-900
+          className="w-8 h-8 flex items-center justify-center text-lg text-gray-900
             border-l border-blue-200 cursor-pointer transition-colors
             hover:bg-amber-100
             focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-inset"
@@ -1967,7 +1972,7 @@ function EditableDigitRow({
           {sign}
         </button>
       ) : (
-        <div className="w-8 h-9 flex items-center justify-center text-lg text-gray-900 border-l border-blue-200">
+        <div className="w-8 h-8 flex items-center justify-center text-lg text-gray-900 border-l border-blue-200">
           {showSign ? sign : ""}
         </div>
       )}

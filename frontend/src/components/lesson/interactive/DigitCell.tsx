@@ -16,7 +16,7 @@
  * grow/shrink flow lives in the parent's onDigit / onBackspace handlers.
  */
 
-type Size = "sm" | "md";
+type Size = "sm" | "md" | "grid";
 type Emphasis = "normal" | "bold";
 type Tone = "default" | "rose";
 
@@ -25,7 +25,11 @@ interface BaseProps {
   borderLeft?: boolean;
   /** Active-column highlight tint. */
   active?: boolean;
-  /** Cell height tier. `md` = h-9 / text-lg; `sm` = h-5 / text-[0.7rem]. */
+  /**
+   * Cell height tier. `md` = h-9 / text-lg; `sm` = h-5 / text-[0.7rem];
+   * `grid` = h-8 (exactly one 32px paper cell) — used by the ciornă scratch
+   * surface so the component tiles the notebook grid 1:1.
+   */
   size?: Size;
 }
 
@@ -59,9 +63,9 @@ export interface DigitCellEditableProps extends BaseProps {
 
 export type DigitCellProps = DigitCellDisplayProps | DigitCellEditableProps;
 
-const SIZE_HEIGHT: Record<Size, string> = { sm: "h-5", md: "h-9" };
-const SIZE_TEXT: Record<Size, string> = { sm: "text-[0.7rem]", md: "text-lg" };
-const SIZE_LEADING: Record<Size, string> = { sm: "leading-5", md: "leading-9" };
+const SIZE_HEIGHT: Record<Size, string> = { sm: "h-5", md: "h-9", grid: "h-8" };
+const SIZE_TEXT: Record<Size, string> = { sm: "text-[0.7rem]", md: "text-lg", grid: "text-lg" };
+const SIZE_LEADING: Record<Size, string> = { sm: "leading-5", md: "leading-9", grid: "leading-8" };
 
 const TONE_COLOR: Record<Tone, string> = {
   default: "text-gray-900",

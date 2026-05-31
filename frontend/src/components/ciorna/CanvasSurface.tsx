@@ -73,7 +73,6 @@ const MIN_SCALE = 0.25;
 const MAX_SCALE = 2;
 const WHEEL_ZOOM_STEP = 0.0015;
 const BUTTON_ZOOM_STEP = 0.25;
-const PLACEMENT_OFFSET_STEP = 18;
 const FIT_PADDING_PX = 32;
 const CLICK_THRESHOLD_PX = 5;
 // Zero-width space — held in the hidden input so mobile keyboards have a
@@ -83,6 +82,11 @@ const SENTINEL = "​";
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
+}
+
+/** Snap a canvas coordinate to the nearest whole cell origin. */
+function snapToGrid(v: number): number {
+  return Math.round(v / GRID_PX) * GRID_PX;
 }
 
 function makeId(prefix: string): string {
@@ -183,13 +187,21 @@ export default function CanvasSurface() {
     positionInputAt(next.gx, next.gy);
   };
 
+  // Backspace: if the focused cell holds a character, clear it and leave the
+  // cursor where it is; if the cell is already empty, step the cursor one cell
+  // left and delete nothing. (Shared by the desktop keydown path and the
+  // mobile sentinel-delete path — both route through here.)
   const handleBackspace = () => {
     const cur = focusedCellRef.current;
     if (!cur) return;
-    const target = { gx: cur.gx - 1, gy: cur.gy };
-    setFocusedCell(target);
-    positionInputAt(target.gx, target.gy);
-    clearCell(target.gx, target.gy);
+    const hasChar = cellText.get(cellKey(cur.gx, cur.gy)) !== undefined;
+    if (hasChar) {
+      clearCell(cur.gx, cur.gy);
+    } else {
+      const target = { gx: cur.gx - 1, gy: cur.gy };
+      setFocusedCell(target);
+      positionInputAt(target.gx, target.gy);
+    }
   };
 
   // ── Smart scan: cells → component card ────────────────────────────────────
@@ -635,13 +647,15 @@ export default function CanvasSurface() {
     if (!rect) return;
     const centerCanvasX = (rect.width / 2 - pan.x) / scale;
     const centerCanvasY = (rect.height / 2 - pan.y) / scale;
-    const offset = (placementCountRef.current % 10) * PLACEMENT_OFFSET_STEP;
+    // Snap the origin to a whole cell, then stagger successive placements by
+    // whole cells so cards don't stack exactly while staying grid-aligned.
+    const offsetCells = placementCountRef.current % 5;
     placementCountRef.current += 1;
     const newCard: CanvasCardItem = {
       id: makeId("card"),
       componentId,
-      x: Math.round(centerCanvasX + offset),
-      y: Math.round(centerCanvasY + offset),
+      x: snapToGrid(centerCanvasX) + offsetCells * GRID_PX,
+      y: snapToGrid(centerCanvasY) + offsetCells * GRID_PX,
       // Default the column-arithmetic operation; ignored by future
       // components that don't carry an operation.
       operation: "addition",
@@ -722,8 +736,6 @@ export default function CanvasSurface() {
     [cellText],
   );
 
-  const isEmpty = cards.length === 0 && cellText.size === 0;
-
   return (
     <div
       ref={canvasRef}
@@ -744,19 +756,23 @@ export default function CanvasSurface() {
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
         }}
       >
-        {/* Notebook-paper backdrop. */}
+        {/* Notebook-paper backdrop. Origin + extent are whole multiples of
+            GRID_PX so the gridlines fall exactly on canvas multiples of 32 —
+            i.e. on the same boundaries cells, the cursor outline, and placed
+            cards are positioned against. (A non-multiple origin like -5000
+            shifts every line ~8px off the cells.) */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute"
           style={{
-            left: -5000,
-            top: -5000,
-            width: 10000,
-            height: 10000,
+            left: -5120,
+            top: -5120,
+            width: 10240,
+            height: 10240,
             backgroundImage:
               "linear-gradient(to right, rgba(96, 165, 250, 0.22) 1px, transparent 1px), " +
               "linear-gradient(to bottom, rgba(96, 165, 250, 0.22) 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
+            backgroundSize: `${GRID_PX}px ${GRID_PX}px`,
             backgroundPosition: "0 0",
           }}
         />
@@ -765,11 +781,13 @@ export default function CanvasSurface() {
             the writing underneath (paper-physics). */}
         {renderedCells}
 
-        {/* Cursor outline. */}
+        {/* Cursor outline. box-border + no rounding so the 2px outline sits
+            dead-center in the 32px cell with its edges coincident with the
+            gridlines (a rounded corner would nudge it off the cell). */}
         {focusedCell && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute rounded-sm border-2 border-amber-400"
+            className="pointer-events-none absolute box-border border-2 border-amber-400"
             style={{
               left: focusedCell.gx * GRID_PX,
               top: focusedCell.gy * GRID_PX,
@@ -814,15 +832,6 @@ export default function CanvasSurface() {
         {/* Cards on top of cells (cards visually obscure underlying writing). */}
         {renderedCards}
       </div>
-
-      {isEmpty && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center">
-          <p className="text-sm text-amber-900/60">
-            Apasă <span className="font-semibold">+</span> pentru o componentă,
-            sau dă click pe foaie pentru a scrie.
-          </p>
-        </div>
-      )}
 
       <CanvasToolbar
         scale={scale}
