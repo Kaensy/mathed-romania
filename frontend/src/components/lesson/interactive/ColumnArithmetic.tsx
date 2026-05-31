@@ -14,7 +14,7 @@
  * addition-style sum walk over the partial-product stack with its own
  * persistent carry band.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Cpu } from "lucide-react";
 import type {
   ColumnArithmeticConfig,
@@ -1335,13 +1335,14 @@ function ArithmeticInputView({
 // ─── Scratch view (mode="scratch") — ciornă draft surface ────────────────────
 //
 // Every column is one 32px paper cell so the card tiles the notebook grid 1:1.
-// Operand + partial rows show DISPLAY digits (non-interactive, so the card
-// drags from them) entered through a grow caret on the units side: typing
-// appends (the number grows leftward, right-anchored), Backspace trims units.
-// There is no overtype or prepend slot. The result row is the only editable
-// surface — solving-mode: each cell independent, cursor starts at units,
-// typing moves the cursor LEFT, Backspace moves it RIGHT. The single operator
-// sign sits at operand row 1's top-right (the cycling button).
+// Operand + partial rows are editable: each digit cell overtypes in place, a
+// neutral prepend slot grows the number leftward, and a transient append caret
+// (units side, shown only while the row is focused) grows it rightward — so at
+// rest the operator hugs the operand with no idle gap. The result row uses the
+// solving-mode model: each cell independent, cursor starts at units, typing
+// moves the cursor LEFT, Backspace moves it RIGHT. The single operator sign
+// sits at operand row 1's top-right (the cycling button). All cells are
+// inputs/buttons, so the card drags only from the surrounding chrome.
 //
 // gridWidth is dynamic — it grows as any row's content reaches the right edge
 // (multiplication also reserves the full product width up front), with
@@ -1349,14 +1350,20 @@ function ArithmeticInputView({
 // and a second sum line that's specific to multiplication; addition +
 // subtraction skip both the partial stack and the second line.
 
-// Scratch values are built left-to-right with the grow caret (append) and
-// trimmed from the right (deleteAt). There is no overtype / prepend: operand
-// digits are display-only (so the card can drag from them) and a prepend slot
-// rendered a stray "+" cell to the operand's left.
+// Operand / partial values are an editable field: each digit cell overtypes in
+// place (type fills, Backspace trims), with two extend affordances —
+//   - prepend: a digit added at the left grows the number leftward;
+//   - append : a digit added at the units side grows it rightward. The append
+//     target is transient (see EditableDigitRow) so the operator hugs the
+//     operand at rest.
 interface FreeEntryHandlers {
-  /** Append d to LSB; the value grows leftward, right-anchored. */
+  /** Overtype the digit at gridLsbPos (the global column index, LSB = 0). */
+  overtype: (idx: number, gridLsbPos: number, newD: number) => void;
+  /** Append d to LSB; the value grows rightward (units side), right-anchored. */
   append: (idx: number, d: number) => void;
-  /** Delete the digit at gridLsbPos (the grow caret passes the units column). */
+  /** Insert d as the new MSB; the value grows leftward. */
+  prepend: (idx: number, d: number) => void;
+  /** Delete the digit at gridLsbPos (the grow / prepend caret pass units). */
   deleteAt: (idx: number, gridLsbPos: number) => void;
 }
 
@@ -1365,8 +1372,10 @@ type ScratchRowType = "op" | "partial";
 interface ScratchFocusIntent {
   rowType: ScratchRowType;
   rowIdx: number;
-  /** The grow caret is the only focus target now. */
-  kind: "grow";
+  /** `cell` targets a digit by grid LSB position; `grow`/`prepend` the carets. */
+  kind: "cell" | "grow" | "prepend";
+  /** Grid LSB position for `kind === "cell"`. Ignored otherwise. */
+  lsbPos?: number;
 }
 
 // Cell pitch in the scratch grid — one notebook-paper cell. Kept in sync with
@@ -1558,6 +1567,13 @@ function ArithmeticScratchView({
   const partialRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const resultRefs = useRef<Map<number, HTMLInputElement>>(new Map());
   const [focusIntent, setFocusIntent] = useState<ScratchFocusIntent | null>(null);
+  // Which row currently holds focus (`${rowType}-${rowIdx}`). Drives the
+  // transient append caret: it only renders while its row is being edited, so
+  // the operator hugs the operand at rest.
+  const [focusedRow, setFocusedRow] = useState<string | null>(null);
+  const setRowFocus = useCallback((key: string, focused: boolean) => {
+    setFocusedRow((prev) => (focused ? key : prev === key ? null : prev));
+  }, []);
 
   // ── Free-entry handler factory (no caps in scratch) ───────────────────────
   // Shared by operands (shift = 0) and partial-product rows (shift = row idx).
@@ -1568,6 +1584,26 @@ function ArithmeticScratchView({
     rowType: ScratchRowType,
     shiftOf: (idx: number) => number,
   ): FreeEntryHandlers => ({
+    overtype: (idx, gridLsbPos, newD) => {
+      const cur = values[idx];
+      if (cur == null) return;
+      const shift = shiftOf(idx);
+      const valLsbPos = gridLsbPos - shift;
+      if (valLsbPos < 0) return;
+      const oldD = digitAt(cur, valLsbPos) ?? 0;
+      if (oldD !== newD) {
+        const next = cur + (newD - oldD) * Math.pow(10, valLsbPos);
+        if (next >= 0) {
+          setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
+        }
+      }
+      // Advance the cursor one cell toward units; past units → the grow caret.
+      if (gridLsbPos > shift) {
+        setFocusIntent({ rowType, rowIdx: idx, kind: "cell", lsbPos: gridLsbPos - 1 });
+      } else {
+        setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
+      }
+    },
     append: (idx, d) => {
       const cur = values[idx];
       if (cur === undefined) return;
@@ -1580,6 +1616,15 @@ function ArithmeticScratchView({
       if (next === cur) return;
       setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
       setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
+    },
+    prepend: (idx, d) => {
+      const cur = values[idx];
+      if (cur == null) return;
+      if (d === 0) return; // leading zero would be a no-op
+      const k = lenOf(cur);
+      const next = d * Math.pow(10, k) + cur;
+      setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
+      setFocusIntent({ rowType, rowIdx: idx, kind: "prepend" });
     },
     deleteAt: (idx, gridLsbPos) => {
       const cur = values[idx];
@@ -1597,7 +1642,11 @@ function ArithmeticScratchView({
       const lowPart = cur % pow;
       const next = highPart * pow + lowPart;
       setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
-      setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
+      if (gridLsbPos === shift) {
+        setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
+      } else {
+        setFocusIntent({ rowType, rowIdx: idx, kind: "cell", lsbPos: gridLsbPos - 1 });
+      }
     },
   });
 
@@ -1644,14 +1693,40 @@ function ArithmeticScratchView({
     if (!focusIntent) return;
     const refMap =
       focusIntent.rowType === "op" ? operandRefs.current : partialRefs.current;
-    const refKey = `${focusIntent.rowType}-${focusIntent.rowIdx}-grow`;
+    const prefix = focusIntent.rowType;
+    const values = focusIntent.rowType === "op" ? operands : partials;
+    const value = values[focusIntent.rowIdx];
+    if (value === undefined) {
+      setFocusIntent(null);
+      return;
+    }
+    let refKey: string;
+    if (focusIntent.kind === "cell") {
+      const shift = focusIntent.rowType === "partial" ? focusIntent.rowIdx : 0;
+      const k = value == null ? 0 : lenOf(value);
+      const filledMin = shift;
+      const filledMax = shift + k - 1;
+      const lsb = focusIntent.lsbPos ?? -1;
+      // Out of the filled range → hand off to the grow caret (past units).
+      if (lsb < filledMin || lsb > filledMax) {
+        refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
+      } else {
+        const msbIdx = gridWidth - 1 - lsb;
+        refKey = `${prefix}-${focusIntent.rowIdx}-${msbIdx}`;
+      }
+    } else if (focusIntent.kind === "prepend") {
+      refKey = `${prefix}-${focusIntent.rowIdx}-prepend`;
+      if (!refMap.has(refKey)) refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
+    } else {
+      refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
+    }
     const el = refMap.get(refKey);
     if (el) {
       el.focus();
       el.select();
     }
     setFocusIntent(null);
-  }, [focusIntent]);
+  }, [focusIntent, operands, partials, gridWidth]);
 
   const resultAllNull = useMemo(
     () => resultDigits.every((d) => d == null),
@@ -1686,6 +1761,8 @@ function ArithmeticScratchView({
               lsbAt={lsbAt}
               sign={sign}
               ariaRowLabel={`Termen ${rowIdx + 1}`}
+              rowFocused={focusedRow === `op-${rowIdx}`}
+              onRowFocusChange={(f) => setRowFocus(`op-${rowIdx}`, f)}
               onSignClick={
                 rowIdx === 0 && onOperationChange
                   ? () => onOperationChange(nextOperation(operation))
@@ -1718,6 +1795,8 @@ function ArithmeticScratchView({
                   lsbAt={lsbAt}
                   sign={sign}
                   ariaRowLabel={`Produs parțial ${idx + 1}`}
+                  rowFocused={focusedRow === `partial-${idx}`}
+                  onRowFocusChange={(f) => setRowFocus(`partial-${idx}`, f)}
                 />
               ))}
               <div
@@ -1784,14 +1863,18 @@ function ArithmeticScratchView({
 // ─── Editable digit row (scratch operands + partials) ────────────────────────
 //
 // One row of the scratch grid that holds a single numeric value, optionally
-// shifted left by N grid columns. Every column is exactly one 32px paper cell:
-// inert spacers, the value's DISPLAY digit cells (non-interactive → the card
-// uses them as a drag handle), an optional prepend slot to the left of the MSB,
-// and a full-cell grow caret on the right. The value is entered/extended through
-// the grow caret (append) and prepend slot (lead) — the display digits
-// themselves are not click-to-edit, which is what lets the whole digit body act
-// as a drag surface. The operator-sign column renders ONLY on the sign row, so
-// there is exactly one operator at operand row 1's top-right.
+// shifted left by N grid columns. Every column is exactly one 32px paper cell.
+// The value is an EDITABLE field: each digit cell overtypes in place (click +
+// type to replace, Backspace trims), and two extend affordances grow it:
+//   - prepend slot (left of the MSB) — a neutral "·" cell, NOT a "+", so it
+//     never reads as a stray operator;
+//   - append caret (units side) — TRANSIENT: rendered only while the row is
+//     focused (or empty, for first-digit entry), so at rest the operator hugs
+//     the operand directly with no idle gap.
+// All cells are <input>/<button>, so the card never drags from this row — only
+// the surrounding chrome (spacers, separator, area beneath the operator) does.
+// The operator-sign column renders ONLY on the sign row (exactly one operator,
+// at operand row 1's top-right).
 
 interface EditableDigitRowProps {
   rowType: ScratchRowType;
@@ -1807,6 +1890,10 @@ interface EditableDigitRowProps {
   lsbAt: (i: number) => number;
   sign: string;
   ariaRowLabel: string;
+  /** True while this row holds focus — gates the transient append caret. */
+  rowFocused: boolean;
+  /** Fired on focusin / focusout of the row (focus leaving the row → false). */
+  onRowFocusChange: (focused: boolean) => void;
   /**
    * Scratch-only: when provided AND showSign, the operator sign cell renders
    * as a button that cycles the operation. Omitting it (lesson / exercise
@@ -1828,28 +1915,80 @@ function EditableDigitRow({
   lsbAt,
   sign,
   ariaRowLabel,
+  rowFocused,
+  onRowFocusChange,
   onSignClick,
 }: EditableDigitRowProps) {
+  const gridWidth = cols.length;
   const k = value == null ? 0 : lenOf(value);
   const filledMinGridLsb = shift;
   const filledMaxGridLsb = shift + k - 1;
+  // Prepend slot sits one grid column LEFT of the current MSB, when the row has
+  // at least one digit and there's room (the empty state uses the append caret
+  // for first-digit entry).
+  const prependGridLsb = k > 0 && shift + k < gridWidth ? shift + k : -1;
   const growKey = `${rowType}-${rowIdx}-grow`;
+  // The append caret is transient: shown only while the row is being edited, so
+  // at rest the operator hugs the operand. An empty row always shows it (the
+  // only entry point for the first digit).
+  const showAppend = value == null || rowFocused;
+
+  const registerRef = (key: string) => (el: HTMLInputElement | null) => {
+    if (el) refs.current.set(key, el);
+    else refs.current.delete(key);
+  };
 
   return (
-    <div className={"flex" + (hasTopBorder ? " border-t border-blue-200" : "")}>
+    <div
+      className={"flex" + (hasTopBorder ? " border-t border-blue-200" : "")}
+      onFocus={() => onRowFocusChange(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          onRowFocusChange(false);
+        }
+      }}
+    >
       {cols.map((i) => {
         const p = lsbAt(i);
 
         if (value != null && p >= filledMinGridLsb && p <= filledMaxGridLsb) {
           const valLsbPos = p - shift;
           const d = digitAt(value, valLsbPos);
-          // Display digit — non-interactive, so the card drags from it.
-          return <DigitCell key={i} size="grid" digit={d} borderLeft={i !== 0} />;
+          // Editable digit — click + type overtypes in place; Backspace trims.
+          return (
+            <DigitCell
+              key={i}
+              size="grid"
+              variant="editable"
+              digit={d}
+              borderLeft={i !== 0}
+              onDigit={(newD) => handlers.overtype(rowIdx, p, newD)}
+              onBackspace={() => handlers.deleteAt(rowIdx, p)}
+              ariaLabel={`${ariaRowLabel}, cifra ${k - valLsbPos}`}
+              inputRef={registerRef(`${rowType}-${rowIdx}-${i}`)}
+            />
+          );
         }
 
-        // Inert spacer. (No prepend slot: it rendered a "+"-placeholder cell to
-        // the left of the operand that read as a stray operator sign. Numbers
-        // are built left-to-right with the grow caret instead.)
+        if (p === prependGridLsb) {
+          // Prepend slot — neutral "·" empty cell (same look as the result-row
+          // empties), grows the number leftward.
+          return (
+            <DigitCell
+              key={i}
+              size="grid"
+              variant="editable"
+              digit={null}
+              borderLeft={i !== 0}
+              onDigit={(d) => handlers.prepend(rowIdx, d)}
+              onBackspace={() => handlers.deleteAt(rowIdx, shift)}
+              ariaLabel={`${ariaRowLabel}, adaugă cifră în față`}
+              inputRef={registerRef(`${rowType}-${rowIdx}-prepend`)}
+            />
+          );
+        }
+
+        // Inert spacer (the card drags from here).
         return (
           <div
             key={i}
@@ -1858,43 +1997,31 @@ function EditableDigitRow({
         );
       })}
 
-      {/* Grow caret — full 32px cell; the units-side entry point for typing /
-          appending. */}
-      <input
-        ref={(el) => {
-          if (el) refs.current.set(growKey, el);
-          else refs.current.delete(growKey);
-        }}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        value=""
-        // Faint hint on an empty row so the entry point is discoverable;
-        // filled rows stay clean (the caret just sits past the last digit).
-        placeholder={value == null ? "·" : undefined}
-        aria-label={`${ariaRowLabel}, scrie cifre`}
-        onFocus={(e) => e.currentTarget.select()}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v === "") return;
-          const last = v.charAt(v.length - 1);
-          if (last >= "0" && last <= "9") handlers.append(rowIdx, Number(last));
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Backspace") {
-            e.preventDefault();
-            handlers.deleteAt(rowIdx, shift);
-          }
-        }}
-        className="w-8 h-8 p-0 m-0 bg-transparent text-center font-mono text-lg leading-8 text-gray-900 placeholder:text-gray-300 border-l border-blue-200 transition-colors focus:bg-blue-100/70 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-inset caret-blue-500"
-      />
+      {/* Transient append caret — units-side entry point, only while editing. */}
+      {showAppend && (
+        <DigitCell
+          size="grid"
+          variant="editable"
+          digit={null}
+          borderLeft
+          onDigit={(d) => handlers.append(rowIdx, d)}
+          onBackspace={() => handlers.deleteAt(rowIdx, shift)}
+          ariaLabel={`${ariaRowLabel}, scrie cifre`}
+          inputRef={registerRef(growKey)}
+        />
+      )}
 
-      {/* Operator column — only on the sign row, so there is exactly one. */}
+      {/* Operator column — only on the sign row, so there is exactly one. At
+          rest (append hidden) it sits flush against the operand's units. */}
       {showSign &&
         (onSignClick ? (
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
+            // Don't let focusing the sign bubble to the row's focus handler —
+            // otherwise cycling the operation would pop the transient append
+            // caret open and shove the operator a cell to the right.
+            onFocus={(e) => e.stopPropagation()}
             onClick={onSignClick}
             aria-label="Schimbă operația"
             title="Schimbă operația"

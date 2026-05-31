@@ -9,9 +9,9 @@
  *
  * Drag handle = any non-interactive region. A pointerdown that does NOT land
  * on an interactive descendant (input / button / link / contenteditable)
- * starts a drag: the separator bar, display digits, spacers, and the empty
- * area beneath the operator all move the card. Interactive elements
- * (result-input cells, the cycling sign button, the close button) keep their
+ * starts a drag: the separator bar, the empty / carry / spacer cells, and the
+ * area beneath the operator all move the card. Interactive elements (operand
+ * + result input cells, the cycling sign button, the close button) keep their
  * own behavior and never initiate a drag.
  *
  *   - During the drag the card tracks the cursor 1:1 at any zoom (delta is
