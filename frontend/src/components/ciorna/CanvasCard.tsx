@@ -1,21 +1,26 @@
 /**
  * CanvasCard — minimal-chrome frame around a placed ciornă component.
  *
- * The card has NO padding ring: its 2-px amber outline (border-box) sits
- * directly on the cell gridlines so the placed component fuses to the paper.
- * The outline doubles as the drag handle:
+ * The card has NO border and NO padding: its component cells sit directly on
+ * the paper gridlines with zero inset. A "movable" frame is drawn only on
+ * hover / focus via `outline` — a non-layout property rendered outside the
+ * cells, so it never displaces the cell grid and never doubles up with a
+ * border.
  *
- *   - pointerdown on the 2-px border (where `target === currentTarget`)
- *     starts a drag. Children fill the content box; their own pointer events
- *     go through untouched (cells stay clickable, inputs stay editable).
+ * Drag handle = any non-interactive region. A pointerdown that does NOT land
+ * on an interactive descendant (input / button / link / contenteditable)
+ * starts a drag: the separator bar, display digits, spacers, and the empty
+ * area beneath the operator all move the card. Interactive elements
+ * (result-input cells, the cycling sign button, the close button) keep their
+ * own behavior and never initiate a drag.
+ *
  *   - During the drag the card tracks the cursor 1:1 at any zoom (delta is
  *     divided by `scale` to convert screen px → canvas px). On drop the
  *     origin snaps to the nearest whole cell.
  *
  * The X close button sits at the top-right corner, invisible at rest and
- * fading in on hover or when the card holds focus (group-hover +
- * group-focus-within). It stops pointerdown propagation so clicking it
- * never starts a drag.
+ * fading in on hover or when the card holds focus. It stops pointerdown
+ * propagation so clicking it never starts a drag.
  *
  * Keyboard:
  *  - tabIndex=0 on the root. Delete + arrow nudges fire only when the
@@ -97,9 +102,13 @@ export default function CanvasCard({
   );
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Only the 2-px outline starts a drag — descendants (inputs, close
-    // button, cells) keep their own pointer behavior.
-    if (e.target !== e.currentTarget) return;
+    // Drag from any NON-interactive region. Interactive descendants
+    // (result-input cells, the cycling sign button, the close button, links,
+    // contenteditable) keep their own pointer behavior and never drag.
+    const t = e.target as HTMLElement;
+    if (t.closest('input, textarea, select, button, a, [contenteditable="true"]')) {
+      return;
+    }
     startDrag(e);
   };
 
@@ -141,11 +150,12 @@ export default function CanvasCard({
       data-card-id={id}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
-      className="group absolute box-border cursor-move border-2 border-amber-300
-        transition-[border-color,box-shadow]
-        hover:border-amber-400
-        focus-within:border-amber-500 focus-within:shadow-[0_2px_10px_-2px_rgba(180,83,9,0.25)]
-        focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-1"
+      className="group absolute cursor-move
+        outline outline-2 outline-offset-0 outline-transparent
+        transition-[outline-color]
+        hover:outline-amber-400/70
+        focus-within:outline-amber-500
+        focus:outline-amber-500"
       style={{
         left: x,
         top: y,

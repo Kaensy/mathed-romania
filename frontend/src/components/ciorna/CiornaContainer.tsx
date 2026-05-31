@@ -10,9 +10,12 @@
  *     within sane min/max bounds. The header's pop-out toggle flips between
  *     docked and popped; toggling back re-docks.
  *
- * Dialog semantics are preserved in every state: focus moves into the body on
- * open, Tab cycles within the panel, Esc and backdrop click close.
- * prefers-reduced-motion users get a fade instead of the slide.
+ * Non-modal by design: the ciornă never traps focus, has no backdrop, and the
+ * page behind it stays fully interactive in both the docked and floating
+ * states — a student must be able to read their result off the ciornă while
+ * typing it into the exercise behind. Clicking outside never closes it; Esc
+ * and the X button are the only close paths. prefers-reduced-motion users get
+ * a fade instead of the slide.
  *
  * Persistence: state is local to this component, so closing or navigating
  * unmounts the container and discards `cards` + canvas pan/zoom — matching
@@ -24,15 +27,6 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { useCiorna } from "@/contexts/CiornaContext";
 
 import CanvasSurface from "./CanvasSurface";
-
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
 
 const DESKTOP_QUERY = "(min-width: 768px)";
 
@@ -55,7 +49,6 @@ function clamp(v: number, lo: number, hi: number): number {
 export default function CiornaContainer() {
   const { isOpen, closeCiorna } = useCiorna();
   const panelRef = useRef<HTMLDivElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   // Desktop vs mobile — pop-out only exists on desktop.
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
@@ -84,53 +77,17 @@ export default function CiornaContainer() {
     if (!isOpen) setIsPopped(false);
   }, [isOpen]);
 
-  // ── Focus trap + Esc + (effective in both layouts) ──────────────────────
+  // ── Esc closes (the only keyboard close path) ────────────────────────────
+  // Non-modal: no focus trap, no focus stealing/restoring. We don't prevent
+  // default or stop propagation beyond closing, so the page behind keeps its
+  // own Esc behavior when the ciornă is shut.
   useEffect(() => {
     if (!isOpen) return;
-
-    previouslyFocusedRef.current =
-      (document.activeElement as HTMLElement | null) ?? null;
-
-    const panel = panelRef.current;
-    const focusables = () =>
-      panel
-        ? Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-        : [];
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        closeCiorna();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const items = focusables();
-      if (items.length === 0) {
-        e.preventDefault();
-        panel?.focus();
-        return;
-      }
-      const first = items[0]!;
-      const last = items[items.length - 1]!;
-      const active = document.activeElement as HTMLElement | null;
-      if (e.shiftKey) {
-        if (active === first || !panel?.contains(active)) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (active === last || !panel?.contains(active)) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
+      if (e.key === "Escape") closeCiorna();
     };
-
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      previouslyFocusedRef.current?.focus?.();
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, closeCiorna]);
 
   // ── Pop-out toggle ───────────────────────────────────────────────────────
@@ -232,20 +189,16 @@ export default function CiornaContainer() {
     "bg-white shadow-2xl animate-[ciornaFade_140ms_ease-out]";
 
   return (
-    <div className="fixed inset-0 z-40">
-      <div
-        className="absolute inset-0 bg-transparent transition-opacity md:bg-slate-900/30"
-        onClick={closeCiorna}
-        aria-hidden="true"
-      />
-
+    // pointer-events-none on the wrapper so empty areas pass clicks through to
+    // the page behind (non-modal); the panel re-enables pointer events. No
+    // backdrop in either state.
+    <div className="pointer-events-none fixed inset-0 z-40">
       <div
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
         aria-labelledby="ciorna-title"
         tabIndex={-1}
-        className={popped ? poppedPanelCls : dockedPanelCls}
+        className={"pointer-events-auto " + (popped ? poppedPanelCls : dockedPanelCls)}
         style={
           popped
             ? { left: rect.x, top: rect.y, width: rect.w, height: rect.h }

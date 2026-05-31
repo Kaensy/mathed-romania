@@ -29,6 +29,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { scratchScanLeadingCols } from "@/components/lesson/interactive/ColumnArithmetic";
 import type { ColumnArithmeticOperation } from "@/types/lesson";
 
 import CanvasCard from "./CanvasCard";
@@ -253,10 +254,18 @@ export default function CanvasSurface() {
           }
           return next;
         });
+        // The scratch grid right-anchors operands to the units column, so
+        // operand 1's leftmost digit sits `leadingCols` cells in from the card
+        // origin. Slide the card left by that much so operand 1's leftmost
+        // digit lands exactly on the run's leftmost typed cell.
+        const leadingCols = scratchScanLeadingCols(
+          result.operation,
+          result.operands,
+        );
         const newCard: CanvasCardItem = {
           id: makeId("card"),
           componentId: comp.id,
-          x: leftmostGx * GRID_PX,
+          x: (leftmostGx - leadingCols) * GRID_PX,
           y: cur.gy * GRID_PX,
           operands: result.operands,
           operation: result.operation,

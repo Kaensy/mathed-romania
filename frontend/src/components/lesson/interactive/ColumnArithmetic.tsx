@@ -1334,29 +1334,29 @@ function ArithmeticInputView({
 
 // ─── Scratch view (mode="scratch") — ciornă draft surface ────────────────────
 //
-// Empty column, all cells waiting. The student types operands, partial
-// products (multiplication), and the result with no auto-computation, no
-// animation, no carry/borrow rendering. Editable rows (operand + partial) use
-// the free-entry keystroke model (display + editable in spirit, but without
-// the digit cap — scratch has no upper bound): grow caret at the right end,
-// prepend slot adjacent to the MSB once a digit exists, per-cell overtype
-// with cursor-advance-right, Backspace trims. Result row uses the
-// solving-mode keystroke model (input): each cell independent, cursor starts
-// at units, typing moves cursor LEFT, Backspace moves cursor RIGHT.
+// Every column is one 32px paper cell so the card tiles the notebook grid 1:1.
+// Operand + partial rows show DISPLAY digits (non-interactive, so the card
+// drags from them) entered through a grow caret on the units side: typing
+// appends (the number grows leftward, right-anchored), Backspace trims units.
+// There is no overtype or prepend slot. The result row is the only editable
+// surface — solving-mode: each cell independent, cursor starts at units,
+// typing moves the cursor LEFT, Backspace moves it RIGHT. The single operator
+// sign sits at operand row 1's top-right (the cycling button).
 //
-// gridWidth is dynamic — it grows as any row's content reaches the right
-// edge, with overflow-x-auto for the wide cases. Partials sit between the
-// top sum line and a second sum line that's specific to multiplication;
-// addition + subtraction skip both the partial stack and the second line.
+// gridWidth is dynamic — it grows as any row's content reaches the right edge
+// (multiplication also reserves the full product width up front), with
+// overflow-x-auto for the wide cases. Partials sit between the top sum line
+// and a second sum line that's specific to multiplication; addition +
+// subtraction skip both the partial stack and the second line.
 
+// Scratch values are built left-to-right with the grow caret (append) and
+// trimmed from the right (deleteAt). There is no overtype / prepend: operand
+// digits are display-only (so the card can drag from them) and a prepend slot
+// rendered a stray "+" cell to the operand's left.
 interface FreeEntryHandlers {
-  /** Overtype the digit at gridLsbPos (the global column index, LSB = 0). */
-  overtype: (idx: number, gridLsbPos: number, newD: number) => void;
-  /** Append d to LSB; grows the row leftward. */
+  /** Append d to LSB; the value grows leftward, right-anchored. */
   append: (idx: number, d: number) => void;
-  /** Insert d as the new MSB. */
-  prepend: (idx: number, d: number) => void;
-  /** Delete the digit at gridLsbPos (or trim units when called from grow / prepend). */
+  /** Delete the digit at gridLsbPos (the grow caret passes the units column). */
   deleteAt: (idx: number, gridLsbPos: number) => void;
 }
 
@@ -1365,15 +1365,63 @@ type ScratchRowType = "op" | "partial";
 interface ScratchFocusIntent {
   rowType: ScratchRowType;
   rowIdx: number;
-  kind: "cell" | "grow" | "prepend";
-  /** Grid LSB position for `kind === "cell"`. Ignored otherwise. */
-  lsbPos?: number;
+  /** The grow caret is the only focus target now. */
+  kind: "grow";
 }
 
+// Cell pitch in the scratch grid — one notebook-paper cell. Kept in sync with
+// CanvasSurface's GRID_PX so a scratch card tiles the paper 1:1.
+const SCRATCH_CELL_PX = 32;
+
+// Minimum scratch grid width (digit columns). Deliberately tight so a scanned
+// card carries only ~1 leading spacer; the grid grows from here as content
+// (or the prepend slot) needs more room.
 function scratchInitialGridWidth(op: ColumnArithmeticOperation): number {
-  if (op === "addition") return MAX_OPERAND_DIGITS.addition + 1;
-  if (op === "subtraction") return MAX_OPERAND_DIGITS.subtraction;
-  return MAX_OPERAND_DIGITS.multiplication * 2;
+  if (op === "addition") return 3;
+  if (op === "subtraction") return 4;
+  return 4;
+}
+
+/** The dynamic grid width for a given operation + content (mirrors the value
+ *  computed inside ArithmeticScratchView from operands alone). */
+function scratchGridWidthFor(
+  op: ColumnArithmeticOperation,
+  operands: number[],
+): number {
+  let contentMaxLsb = -1;
+  for (const o of operands) {
+    if (Number.isFinite(o) && o >= 0) {
+      contentMaxLsb = Math.max(contentMaxLsb, lenOf(o) - 1);
+    }
+  }
+  // Mirror the view's product reserve so scan anchoring matches the real grid.
+  const a = operands[0];
+  const b = operands[1];
+  const productReserve =
+    op === "multiplication" &&
+    a !== undefined &&
+    b !== undefined &&
+    Number.isFinite(a) &&
+    Number.isFinite(b)
+      ? lenOf(a) + lenOf(b)
+      : 0;
+  return Math.max(scratchInitialGridWidth(op), contentMaxLsb + 2, productReserve);
+}
+
+/**
+ * How many grid columns sit to the LEFT of operand 1's leftmost digit when a
+ * scanned card is rendered (operands are right-anchored to the units column).
+ * The canvas slides the card left by this many cells so operand 1's leftmost
+ * digit lands exactly on the run's leftmost typed cell.
+ */
+export function scratchScanLeadingCols(
+  op: ColumnArithmeticOperation,
+  operands: number[],
+): number {
+  const op1 = operands[0];
+  if (op1 === undefined || !Number.isFinite(op1)) return 0;
+  const gridWidth = scratchGridWidthFor(op, operands);
+  return Math.max(0, gridWidth - lenOf(op1));
 }
 
 /** Cycle order for the scratch operator-sign button: + → − → × → + */
@@ -1454,7 +1502,14 @@ function ArithmeticScratchView({
     }
     return max;
   }, [operands, partials, resultDigits]);
-  const gridWidth = Math.max(initialGridWidth, contentMaxLsb + 2);
+  // Multiplication reserves enough columns for the full product up front, so
+  // the result row can hold every digit even before any partials are typed
+  // (the low initial floor would otherwise cap a wide product).
+  const productReserve =
+    operation === "multiplication" && operands[0] != null && operands[1] != null
+      ? lenOf(operands[0]) + lenOf(operands[1])
+      : 0;
+  const gridWidth = Math.max(initialGridWidth, contentMaxLsb + 2, productReserve);
 
   // Grow resultDigits to gridWidth (never shrink — would lose typed cells).
   useEffect(() => {
@@ -1513,25 +1568,6 @@ function ArithmeticScratchView({
     rowType: ScratchRowType,
     shiftOf: (idx: number) => number,
   ): FreeEntryHandlers => ({
-    overtype: (idx, gridLsbPos, newD) => {
-      const cur = values[idx];
-      if (cur == null) return;
-      const shift = shiftOf(idx);
-      const valLsbPos = gridLsbPos - shift;
-      if (valLsbPos < 0) return;
-      const oldD = digitAt(cur, valLsbPos) ?? 0;
-      if (oldD !== newD) {
-        const next = cur + (newD - oldD) * Math.pow(10, valLsbPos);
-        if (next >= 0) {
-          setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
-        }
-      }
-      if (gridLsbPos > shift) {
-        setFocusIntent({ rowType, rowIdx: idx, kind: "cell", lsbPos: gridLsbPos - 1 });
-      } else {
-        setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
-      }
-    },
     append: (idx, d) => {
       const cur = values[idx];
       if (cur === undefined) return;
@@ -1544,15 +1580,6 @@ function ArithmeticScratchView({
       if (next === cur) return;
       setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
       setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
-    },
-    prepend: (idx, d) => {
-      const cur = values[idx];
-      if (cur == null) return;
-      if (d === 0) return;
-      const k = lenOf(cur);
-      const next = d * Math.pow(10, k) + cur;
-      setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
-      setFocusIntent({ rowType, rowIdx: idx, kind: "prepend" });
     },
     deleteAt: (idx, gridLsbPos) => {
       const cur = values[idx];
@@ -1570,11 +1597,7 @@ function ArithmeticScratchView({
       const lowPart = cur % pow;
       const next = highPart * pow + lowPart;
       setValues((prev) => prev.map((v, i) => (i === idx ? next : v)));
-      if (gridLsbPos === shift) {
-        setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
-      } else {
-        setFocusIntent({ rowType, rowIdx: idx, kind: "cell", lsbPos: gridLsbPos - 1 });
-      }
+      setFocusIntent({ rowType, rowIdx: idx, kind: "grow" });
     },
   });
 
@@ -1621,39 +1644,14 @@ function ArithmeticScratchView({
     if (!focusIntent) return;
     const refMap =
       focusIntent.rowType === "op" ? operandRefs.current : partialRefs.current;
-    const prefix = focusIntent.rowType;
-    const values = focusIntent.rowType === "op" ? operands : partials;
-    const value = values[focusIntent.rowIdx];
-    if (value === undefined) {
-      setFocusIntent(null);
-      return;
-    }
-    let refKey: string;
-    if (focusIntent.kind === "cell") {
-      const shift = focusIntent.rowType === "partial" ? focusIntent.rowIdx : 0;
-      const k = value == null ? 0 : lenOf(value);
-      const filledMin = shift;
-      const filledMax = shift + k - 1;
-      const lsb = focusIntent.lsbPos ?? -1;
-      if (lsb < filledMin || lsb > filledMax) {
-        refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
-      } else {
-        const msbIdx = gridWidth - 1 - lsb;
-        refKey = `${prefix}-${focusIntent.rowIdx}-${msbIdx}`;
-      }
-    } else if (focusIntent.kind === "prepend") {
-      refKey = `${prefix}-${focusIntent.rowIdx}-prepend`;
-      if (!refMap.has(refKey)) refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
-    } else {
-      refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
-    }
+    const refKey = `${focusIntent.rowType}-${focusIntent.rowIdx}-grow`;
     const el = refMap.get(refKey);
     if (el) {
       el.focus();
       el.select();
     }
     setFocusIntent(null);
-  }, [focusIntent, operands, partials, gridWidth]);
+  }, [focusIntent]);
 
   const resultAllNull = useMemo(
     () => resultDigits.every((d) => d == null),
@@ -1686,10 +1684,8 @@ function ArithmeticScratchView({
               hasTopBorder={rowIdx > 0}
               cols={cols}
               lsbAt={lsbAt}
-              gridWidth={gridWidth}
               sign={sign}
               ariaRowLabel={`Termen ${rowIdx + 1}`}
-              clickToFocusWhenEmpty
               onSignClick={
                 rowIdx === 0 && onOperationChange
                   ? () => onOperationChange(nextOperation(operation))
@@ -1698,7 +1694,12 @@ function ArithmeticScratchView({
             />
           ))}
 
-          <div className="border-t-2 border-gray-800" />
+          {/* Separator spans the digit body only (not the grow caret / operator
+              column), so it tiles the grid and reads as a Romanian sum bar. */}
+          <div
+            className="border-t-2 border-gray-800"
+            style={{ width: gridWidth * SCRATCH_CELL_PX }}
+          />
 
           {operation === "multiplication" && partials.length > 0 && (
             <>
@@ -1715,18 +1716,20 @@ function ArithmeticScratchView({
                   hasTopBorder={idx > 0}
                   cols={cols}
                   lsbAt={lsbAt}
-                  gridWidth={gridWidth}
                   sign={sign}
                   ariaRowLabel={`Produs parțial ${idx + 1}`}
                 />
               ))}
-              <div className="border-t-2 border-gray-800" />
+              <div
+                className="border-t-2 border-gray-800"
+                style={{ width: gridWidth * SCRATCH_CELL_PX }}
+              />
             </>
           )}
 
-          {/* Result row — solving-mode. When empty, mousedown-anywhere routes
-              focus to units (the default starting cell), matching the
-              click-to-focus rule for the empty operand area. */}
+          {/* Result row — solving-mode editable cells (the only editable cells
+              in the card). When empty, mousedown-anywhere routes focus to units,
+              the default starting cell. */}
           <div
             className="flex"
             onMouseDown={
@@ -1762,8 +1765,6 @@ function ArithmeticScratchView({
                 />
               );
             })}
-            <div className="w-3 h-8 border-l border-blue-200" aria-hidden />
-            <div className="w-8 h-8 border-l border-blue-200" />
           </div>
         </div>
       </div>
@@ -1783,11 +1784,14 @@ function ArithmeticScratchView({
 // ─── Editable digit row (scratch operands + partials) ────────────────────────
 //
 // One row of the scratch grid that holds a single numeric value, optionally
-// shifted left by N grid columns. Renders inert spacers, filled DigitCells,
-// an optional prepend slot to the left of the MSB, and a slim grow caret on
-// the right. The operator sign column sits in a sibling div so the
-// click-to-focus wrapper (applied when value === null) doesn't capture
-// clicks on the sign.
+// shifted left by N grid columns. Every column is exactly one 32px paper cell:
+// inert spacers, the value's DISPLAY digit cells (non-interactive → the card
+// uses them as a drag handle), an optional prepend slot to the left of the MSB,
+// and a full-cell grow caret on the right. The value is entered/extended through
+// the grow caret (append) and prepend slot (lead) — the display digits
+// themselves are not click-to-edit, which is what lets the whole digit body act
+// as a drag surface. The operator-sign column renders ONLY on the sign row, so
+// there is exactly one operator at operand row 1's top-right.
 
 interface EditableDigitRowProps {
   rowType: ScratchRowType;
@@ -1801,11 +1805,8 @@ interface EditableDigitRowProps {
   hasTopBorder: boolean;
   cols: number[];
   lsbAt: (i: number) => number;
-  gridWidth: number;
   sign: string;
   ariaRowLabel: string;
-  /** When true and value === null, mousedown-anywhere focuses the grow caret. */
-  clickToFocusWhenEmpty?: boolean;
   /**
    * Scratch-only: when provided AND showSign, the operator sign cell renders
    * as a button that cycles the operation. Omitting it (lesson / exercise
@@ -1825,157 +1826,90 @@ function EditableDigitRow({
   hasTopBorder,
   cols,
   lsbAt,
-  gridWidth,
   sign,
   ariaRowLabel,
-  clickToFocusWhenEmpty = false,
   onSignClick,
 }: EditableDigitRowProps) {
   const k = value == null ? 0 : lenOf(value);
   const filledMinGridLsb = shift;
   const filledMaxGridLsb = shift + k - 1;
-  // Prepend slot sits one grid column LEFT of the current MSB, only when the
-  // row already has at least one digit (the empty state uses the grow caret
-  // for first-digit entry; a prepend slot in that state would be redundant).
-  const prependGridLsb = k > 0 && shift + k < gridWidth ? shift + k : -1;
   const growKey = `${rowType}-${rowIdx}-grow`;
-  const isEmpty = value == null;
 
   return (
     <div className={"flex" + (hasTopBorder ? " border-t border-blue-200" : "")}>
-      <div
-        className="flex flex-1"
-        onMouseDown={
-          isEmpty && clickToFocusWhenEmpty
-            ? (e) => {
-                e.preventDefault();
-                const el = refs.current.get(growKey);
-                if (el) {
-                  el.focus();
-                  el.select();
-                }
-              }
-            : undefined
+      {cols.map((i) => {
+        const p = lsbAt(i);
+
+        if (value != null && p >= filledMinGridLsb && p <= filledMaxGridLsb) {
+          const valLsbPos = p - shift;
+          const d = digitAt(value, valLsbPos);
+          // Display digit — non-interactive, so the card drags from it.
+          return <DigitCell key={i} size="grid" digit={d} borderLeft={i !== 0} />;
         }
-      >
-        {cols.map((i) => {
-          const p = lsbAt(i);
-          const refKey = `${rowType}-${rowIdx}-${i}`;
 
-          if (value != null && p >= filledMinGridLsb && p <= filledMaxGridLsb) {
-            const valLsbPos = p - shift;
-            const d = digitAt(value, valLsbPos);
-            return (
-              <DigitCell
-                key={i}
-                size="grid"
-                variant="editable"
-                digit={d}
-                borderLeft={i !== 0}
-                onDigit={(newD) => handlers.overtype(rowIdx, p, newD)}
-                onBackspace={() => handlers.deleteAt(rowIdx, p)}
-                ariaLabel={`${ariaRowLabel}, cifra ${k - valLsbPos}`}
-                inputRef={(el) => {
-                  if (el) refs.current.set(refKey, el);
-                  else refs.current.delete(refKey);
-                }}
-              />
-            );
+        // Inert spacer. (No prepend slot: it rendered a "+"-placeholder cell to
+        // the left of the operand that read as a stray operator sign. Numbers
+        // are built left-to-right with the grow caret instead.)
+        return (
+          <div
+            key={i}
+            className={"w-8 h-8 " + (i !== 0 ? "border-l border-blue-200" : "")}
+          />
+        );
+      })}
+
+      {/* Grow caret — full 32px cell; the units-side entry point for typing /
+          appending. */}
+      <input
+        ref={(el) => {
+          if (el) refs.current.set(growKey, el);
+          else refs.current.delete(growKey);
+        }}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        value=""
+        // Faint hint on an empty row so the entry point is discoverable;
+        // filled rows stay clean (the caret just sits past the last digit).
+        placeholder={value == null ? "·" : undefined}
+        aria-label={`${ariaRowLabel}, scrie cifre`}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === "") return;
+          const last = v.charAt(v.length - 1);
+          if (last >= "0" && last <= "9") handlers.append(rowIdx, Number(last));
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Backspace") {
+            e.preventDefault();
+            handlers.deleteAt(rowIdx, shift);
           }
+        }}
+        className="w-8 h-8 p-0 m-0 bg-transparent text-center font-mono text-lg leading-8 text-gray-900 placeholder:text-gray-300 border-l border-blue-200 transition-colors focus:bg-blue-100/70 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-inset caret-blue-500"
+      />
 
-          if (p === prependGridLsb) {
-            const prependKey = `${rowType}-${rowIdx}-prepend`;
-            return (
-              <input
-                key={i}
-                ref={(el) => {
-                  if (el) refs.current.set(prependKey, el);
-                  else refs.current.delete(prependKey);
-                }}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                value=""
-                placeholder="+"
-                aria-label={`${ariaRowLabel}, adaugă cifră în față`}
-                onFocus={(e) => e.currentTarget.select()}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "") return;
-                  const last = v.charAt(v.length - 1);
-                  if (last >= "0" && last <= "9") handlers.prepend(rowIdx, Number(last));
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Backspace") {
-                    e.preventDefault();
-                    handlers.deleteAt(rowIdx, shift);
-                  }
-                }}
-                className={
-                  "w-8 h-8 p-0 m-0 text-center font-mono text-lg leading-8 " +
-                  "bg-indigo-50/50 text-indigo-700 placeholder:text-indigo-300 " +
-                  "transition-colors focus:bg-indigo-100/70 focus:outline-none " +
-                  "focus:ring-1 focus:ring-indigo-400 focus:ring-inset caret-indigo-500 " +
-                  (i !== 0 ? "border-l border-blue-200" : "")
-                }
-              />
-            );
-          }
-
-          return (
-            <div
-              key={i}
-              className={"w-8 h-8 " + (i !== 0 ? "border-l border-blue-200" : "")}
-            />
-          );
-        })}
-
-        <input
-          ref={(el) => {
-            if (el) refs.current.set(growKey, el);
-            else refs.current.delete(growKey);
-          }}
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value=""
-          aria-label={`${ariaRowLabel}, scrie cifre`}
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === "") return;
-            const last = v.charAt(v.length - 1);
-            if (last >= "0" && last <= "9") handlers.append(rowIdx, Number(last));
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Backspace") {
-              e.preventDefault();
-              handlers.deleteAt(rowIdx, shift);
-            }
-          }}
-          className="w-3 h-8 p-0 m-0 bg-transparent text-center font-mono text-lg leading-8 text-gray-900 border-l border-blue-200 transition-colors focus:bg-blue-100/70 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-inset caret-blue-500"
-        />
-      </div>
-
-      {showSign && onSignClick ? (
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={onSignClick}
-          aria-label="Schimbă operația"
-          title="Schimbă operația"
-          className="w-8 h-8 flex items-center justify-center text-lg text-gray-900
-            border-l border-blue-200 cursor-pointer transition-colors
-            hover:bg-amber-100
-            focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-inset"
-        >
-          {sign}
-        </button>
-      ) : (
-        <div className="w-8 h-8 flex items-center justify-center text-lg text-gray-900 border-l border-blue-200">
-          {showSign ? sign : ""}
-        </div>
-      )}
+      {/* Operator column — only on the sign row, so there is exactly one. */}
+      {showSign &&
+        (onSignClick ? (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={onSignClick}
+            aria-label="Schimbă operația"
+            title="Schimbă operația"
+            className="w-8 h-8 flex items-center justify-center text-lg text-gray-900
+              border-l border-blue-200 cursor-pointer transition-colors
+              hover:bg-amber-100
+              focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-inset"
+          >
+            {sign}
+          </button>
+        ) : (
+          <div className="w-8 h-8 flex items-center justify-center text-lg text-gray-900 border-l border-blue-200">
+            {sign}
+          </div>
+        ))}
     </div>
   );
 }
