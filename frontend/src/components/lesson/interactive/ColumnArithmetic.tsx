@@ -1741,12 +1741,15 @@ function ArithmeticScratchView({
   const lsbAt = (i: number) => gridWidth - 1 - i;
 
   return (
-    <div className="my-2">
+    // No vertical margin: the content's top edge must be flush with the card's
+    // snapped top-left so the first row begins on a paper gridline.
+    <div>
       <div className="overflow-x-auto">
         {/* No border / rounding / bg here: the scratch grid sits directly on
             the ciornă paper so its 32px cells tile the notebook grid 1:1 and
-            the enclosing CanvasCard's amber outline is the only frame. */}
-        <div className="inline-block font-mono select-none">
+            the enclosing CanvasCard's amber outline is the only frame.
+            align-top avoids an inline-block baseline gap above the first row. */}
+        <div className="inline-block align-top font-mono select-none">
           {operands.map((opVal, rowIdx) => (
             <EditableDigitRow
               key={`op-${rowIdx}`}
@@ -1757,7 +1760,6 @@ function ArithmeticScratchView({
               refs={operandRefs}
               handlers={operandHandlers}
               showSign={rowIdx === 0}
-              hasTopBorder={rowIdx > 0}
               cols={cols}
               lsbAt={lsbAt}
               sign={sign}
@@ -1773,10 +1775,13 @@ function ArithmeticScratchView({
           ))}
 
           {/* Separator spans the digit body only (not the grow caret / operator
-              column), so it tiles the grid and reads as a Romanian sum bar. */}
+              column), so it tiles the grid and reads as a Romanian sum bar. Its
+              2px sits ON the gridline between the operand and result rows and is
+              cancelled with a -2px bottom margin so it consumes no row height
+              (the result row stays on the next gridline). */}
           <div
             className="border-t-2 border-gray-800"
-            style={{ width: gridWidth * SCRATCH_CELL_PX }}
+            style={{ width: gridWidth * SCRATCH_CELL_PX, marginBottom: -2 }}
           />
 
           {operation === "multiplication" && partials.length > 0 && (
@@ -1791,7 +1796,6 @@ function ArithmeticScratchView({
                   refs={partialRefs}
                   handlers={partialHandlers}
                   showSign={false}
-                  hasTopBorder={idx > 0}
                   cols={cols}
                   lsbAt={lsbAt}
                   sign={sign}
@@ -1802,7 +1806,7 @@ function ArithmeticScratchView({
               ))}
               <div
                 className="border-t-2 border-gray-800"
-                style={{ width: gridWidth * SCRATCH_CELL_PX }}
+                style={{ width: gridWidth * SCRATCH_CELL_PX, marginBottom: -2 }}
               />
             </>
           )}
@@ -1887,7 +1891,6 @@ interface EditableDigitRowProps {
   refs: React.MutableRefObject<Map<string, HTMLInputElement>>;
   handlers: FreeEntryHandlers;
   showSign: boolean;
-  hasTopBorder: boolean;
   cols: number[];
   lsbAt: (i: number) => number;
   sign: string;
@@ -1912,7 +1915,6 @@ function EditableDigitRow({
   refs,
   handlers,
   showSign,
-  hasTopBorder,
   cols,
   lsbAt,
   sign,
@@ -1942,8 +1944,11 @@ function EditableDigitRow({
   };
 
   return (
+    // No border-t: the row is exactly 32px (its cells) and a border on the
+    // auto-height row would add a pixel that accumulates down the stack. Rows
+    // tile the paper grid, so the paper's own horizontal gridline divides them.
     <div
-      className={"flex" + (hasTopBorder ? " border-t border-blue-200" : "")}
+      className="flex"
       onFocus={() => onRowFocusChange(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
