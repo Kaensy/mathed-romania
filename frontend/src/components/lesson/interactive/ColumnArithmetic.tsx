@@ -1486,8 +1486,12 @@ function ArithmeticScratchView({
       typeof b === "number" && Number.isFinite(b) && b >= 0 ? b : null,
     ];
   });
-  // One partial per multiplier digit (LSB-first). Empty for non-mul or empty multiplier.
-  const [partials, setPartials] = useState<(number | null)[]>([]);
+  // One partial-product row per multiplier digit. Each partial is a per-cell
+  // digit array indexed by grid LSB position (like resultDigits) — solving-mode
+  // editable cells, NOT a free-entry number — so partial rows lay out and
+  // behave exactly like the result row. Partial p is shifted left by p: its
+  // editable cells start at grid LSB p (the rightmost p columns stay blank).
+  const [partials, setPartials] = useState<(number | null)[][]>([]);
   const [resultDigits, setResultDigits] = useState<(number | null)[]>(() =>
     new Array(initialGridWidth).fill(null),
   );
@@ -1501,9 +1505,15 @@ function ArithmeticScratchView({
     for (const op of operands) {
       if (op != null) max = Math.max(max, lenOf(op) - 1);
     }
-    partials.forEach((p, i) => {
-      if (p != null) max = Math.max(max, i + lenOf(p) - 1);
-    });
+    // Highest filled grid-LSB across every partial-digit array.
+    for (const p of partials) {
+      for (let i = p.length - 1; i >= 0; i--) {
+        if (p[i] != null) {
+          max = Math.max(max, i);
+          break;
+        }
+      }
+    }
     for (let i = resultDigits.length - 1; i >= 0; i--) {
       if (resultDigits[i] != null) {
         max = Math.max(max, i);
@@ -1531,9 +1541,23 @@ function ArithmeticScratchView({
     });
   }, [gridWidth]);
 
+  // Grow each partial-digit array to gridWidth as well.
+  useEffect(() => {
+    setPartials((prev) => {
+      if (prev.every((p) => p.length >= gridWidth)) return prev;
+      return prev.map((p) => {
+        if (p.length >= gridWidth) return p;
+        const next = p.slice();
+        while (next.length < gridWidth) next.push(null);
+        return next;
+      });
+    });
+  }, [gridWidth]);
+
   // Sync partial row count. For multiplication, the count matches the
-  // multiplier's digit count; for other operations partials are always empty
-  // (so a cycle from mul → add/sub clears any leftover partial values).
+  // multiplier's digit count; for other operations there are no partials
+  // (so a cycle from mul → add/sub clears any leftover partial values). New
+  // rows start as empty gridWidth-length digit arrays.
   useEffect(() => {
     if (operation !== "multiplication") {
       setPartials((prev) => (prev.length === 0 ? prev : []));
@@ -1545,12 +1569,12 @@ function ArithmeticScratchView({
       if (prev.length === count) return prev;
       if (prev.length < count) {
         const next = prev.slice();
-        while (next.length < count) next.push(null);
+        while (next.length < count) next.push(new Array(gridWidth).fill(null));
         return next;
       }
       return prev.slice(0, count);
     });
-  }, [operands, operation]);
+  }, [operands, operation, gridWidth]);
 
   // Reset answer state when operation changes — operands preserve, but the
   // result row clears (and the partials sync above clears partials). On the
@@ -1652,7 +1676,6 @@ function ArithmeticScratchView({
   });
 
   const operandHandlers = makeHandlers(operands, setOperands, "op", () => 0);
-  const partialHandlers = makeHandlers(partials, setPartials, "partial", (idx) => idx);
 
   // ── Result mutators (solving-mode) ─────────────────────────────────────────
   // Imperative focus (no state-driven effect) so the initial mount focus on
@@ -1685,49 +1708,81 @@ function ArithmeticScratchView({
     focusResultAt(Math.max(lsbPos - 1, 0));
   };
 
+  // ── Partial mutators (solving-mode, same model as the result row) ──────────
+  // Each partial is a per-cell digit array; partial p's editable cells start at
+  // grid LSB p (its units), so the cursor never drops below p.
+  const partialRefKey = (pi: number, lsbPos: number) => `${pi}-${lsbPos}`;
+  const focusPartialAt = (pi: number, lsbPos: number) => {
+    requestAnimationFrame(() => {
+      const el = partialRefs.current.get(partialRefKey(pi, lsbPos));
+      if (el) {
+        el.focus();
+        el.select();
+      }
+    });
+  };
+  const setPartialDigit = (pi: number, lsbPos: number, d: number) => {
+    setPartials((prev) =>
+      prev.map((p, i) => {
+        if (i !== pi || p[lsbPos] === d) return p;
+        const next = p.slice();
+        next[lsbPos] = d;
+        return next;
+      }),
+    );
+    focusPartialAt(pi, Math.min(lsbPos + 1, gridWidth - 1)); // cursor → MSB
+  };
+  const clearPartialDigit = (pi: number, lsbPos: number) => {
+    setPartials((prev) =>
+      prev.map((p, i) => {
+        if (i !== pi || p[lsbPos] == null) return p;
+        const next = p.slice();
+        next[lsbPos] = null;
+        return next;
+      }),
+    );
+    focusPartialAt(pi, Math.max(lsbPos - 1, pi)); // cursor → units, not below shift
+  };
+
   // ── Initial focus + focusIntent resolver ──────────────────────────────────
   useEffect(() => {
     operandRefs.current.get("op-0-grow")?.focus();
   }, []);
 
+  // Only operand rows use the free-entry focus model (the EditableDigitRow
+  // overtype / prepend / append carets). Partial + result rows are solving-mode
+  // with their own imperative focus, so this resolver is operand-only.
   useEffect(() => {
     if (!focusIntent) return;
-    const refMap =
-      focusIntent.rowType === "op" ? operandRefs.current : partialRefs.current;
-    const prefix = focusIntent.rowType;
-    const values = focusIntent.rowType === "op" ? operands : partials;
-    const value = values[focusIntent.rowIdx];
+    const value = operands[focusIntent.rowIdx];
     if (value === undefined) {
       setFocusIntent(null);
       return;
     }
     let refKey: string;
     if (focusIntent.kind === "cell") {
-      const shift = focusIntent.rowType === "partial" ? focusIntent.rowIdx : 0;
       const k = value == null ? 0 : lenOf(value);
-      const filledMin = shift;
-      const filledMax = shift + k - 1;
       const lsb = focusIntent.lsbPos ?? -1;
       // Out of the filled range → hand off to the grow caret (past units).
-      if (lsb < filledMin || lsb > filledMax) {
-        refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
+      if (lsb < 0 || lsb > k - 1) {
+        refKey = `op-${focusIntent.rowIdx}-grow`;
       } else {
         const msbIdx = gridWidth - 1 - lsb;
-        refKey = `${prefix}-${focusIntent.rowIdx}-${msbIdx}`;
+        refKey = `op-${focusIntent.rowIdx}-${msbIdx}`;
       }
     } else if (focusIntent.kind === "prepend") {
-      refKey = `${prefix}-${focusIntent.rowIdx}-prepend`;
-      if (!refMap.has(refKey)) refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
+      refKey = `op-${focusIntent.rowIdx}-prepend`;
+      if (!operandRefs.current.has(refKey)) refKey = `op-${focusIntent.rowIdx}-grow`;
     } else {
-      refKey = `${prefix}-${focusIntent.rowIdx}-grow`;
+      refKey = `op-${focusIntent.rowIdx}-grow`;
     }
-    const el = refMap.get(refKey);
+    const el = operandRefs.current.get(refKey);
     if (el) {
       el.focus();
       el.select();
     }
     setFocusIntent(null);
-  }, [focusIntent, operands, partials, gridWidth]);
+  }, [focusIntent, operands, gridWidth]);
 
   const resultAllNull = useMemo(
     () => resultDigits.every((d) => d == null),
@@ -1786,24 +1841,65 @@ function ArithmeticScratchView({
 
           {operation === "multiplication" && partials.length > 0 && (
             <>
-              {partials.map((pVal, idx) => (
-                <EditableDigitRow
-                  key={`partial-${idx}`}
-                  rowType="partial"
-                  rowIdx={idx}
-                  value={pVal}
-                  shift={idx}
-                  refs={partialRefs}
-                  handlers={partialHandlers}
-                  showSign={false}
-                  cols={cols}
-                  lsbAt={lsbAt}
-                  sign={sign}
-                  ariaRowLabel={`Produs parțial ${idx + 1}`}
-                  rowFocused={focusedRow === `partial-${idx}`}
-                  onRowFocusChange={(f) => setRowFocus(`partial-${idx}`, f)}
-                />
-              ))}
+              {/* Partial-product rows — solving-mode, exactly like the result
+                  row, but shifted: partial p's editable cells start at grid LSB
+                  p (the rightmost p columns are inert blanks). No operator
+                  column, so nothing leaks to the top-right. */}
+              {partials.map((pDigits, pi) => {
+                const allNull = pDigits.every((d) => d == null);
+                return (
+                  <div
+                    key={`partial-${pi}`}
+                    className="flex"
+                    onMouseDown={
+                      allNull
+                        ? (e) => {
+                            e.preventDefault();
+                            const el = partialRefs.current.get(
+                              partialRefKey(pi, pi),
+                            );
+                            if (el) {
+                              el.focus();
+                              el.select();
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    {cols.map((i) => {
+                      const lsbPos = lsbAt(i);
+                      // Columns below the shift stay blank (and draggable).
+                      if (lsbPos < pi) {
+                        return (
+                          <div
+                            key={i}
+                            className={
+                              "w-8 h-8 " + (i !== 0 ? "border-l border-blue-200" : "")
+                            }
+                          />
+                        );
+                      }
+                      return (
+                        <DigitCell
+                          key={i}
+                          size="grid"
+                          variant="editable"
+                          digit={pDigits[lsbPos] ?? null}
+                          borderLeft={i !== 0}
+                          onDigit={(d) => setPartialDigit(pi, lsbPos, d)}
+                          onBackspace={() => clearPartialDigit(pi, lsbPos)}
+                          inputRef={(el) => {
+                            const key = partialRefKey(pi, lsbPos);
+                            if (el) partialRefs.current.set(key, el);
+                            else partialRefs.current.delete(key);
+                          }}
+                          ariaLabel={`Produs parțial ${pi + 1}, ${SCRATCH_PLACE_LABELS[lsbPos] ?? `poziția ${lsbPos + 1}`}`}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })}
               <div
                 className="border-t-2 border-gray-800"
                 style={{ width: gridWidth * SCRATCH_CELL_PX, marginBottom: -2 }}
@@ -1852,15 +1948,10 @@ function ArithmeticScratchView({
           </div>
         </div>
       </div>
-
-      {operation === "subtraction" &&
-        operands[0] != null &&
-        operands[1] != null &&
-        operands[0] < operands[1] && (
-          <p className="mt-2 text-sm text-amber-700 italic">
-            Numărul de sus trebuie să fie cel puțin egal cu cel de jos.
-          </p>
-        )}
+      {/* The ciornă is a free scratchpad: it never validates, warns, or guides
+          (no minuend/subtrahend message, no division/multiplication hints) —
+          that belongs to lessons and exercises. It stays silent whatever the
+          student writes. */}
     </div>
   );
 }
